@@ -1,0 +1,17 @@
+{
+  "name": "videogen-studio",
+  "productName": "Videogen Studio",
+  "version": "1.0.0",
+  "description": "Local image-to-video generation with Wan 2.2 A14B",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "mock": "set WAN_MOCK=1&& set WAN_PORT=7861&& electron ."
+  },
+  "devDependencies": {
+    "electron": "33.4.11"
+  },
+  "license": "MIT",
+  "author": "Danieljsem"
+}

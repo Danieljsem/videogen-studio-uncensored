@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Videogen Studio</title>
+<link rel="icon" href="/static/favicon.png">
+<style>
+:root{
+  --bg:#121110; --panel:#1a1917; --panel2:#211f1c; --line:#2c2925; --line2:#3a3631;
+  --text:#ece7e0; --muted:#9a938a; --faint:#6b655d;
+  --accent:#e8a35c; --accent-ink:#1b1309; --accent-soft:rgba(232,163,92,.14);
+  --danger:#e5684f; --ok:#7fbf8a;
+  --r:0; --r-sm:0;
+  --font:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
+  --display:"Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.45 var(--font);-webkit-font-smoothing:antialiased;overflow:hidden}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:0}
+svg{display:block}
+
+.app{display:grid;grid-template-columns:232px 1fr;height:100vh}
+
+/* ---------- sidebar ---------- */
+.side{border-right:1px solid var(--line);display:flex;flex-direction:column;padding:18px 12px 14px;gap:4px;background:#151412}
+.brand{display:flex;align-items:center;gap:10px;padding:2px 8px 20px;font:600 15px var(--display);letter-spacing:.01em}
+.brand .mark{width:26px;height:26px;display:block}
+.nav{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:0;color:var(--muted);width:100%;text-align:left}
+.nav:hover{background:var(--panel2);color:var(--text)}
+.nav.on{background:var(--panel2);color:var(--text)}
+.nav .count{margin-left:auto;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+.side-sec{font-size:11.5px;color:var(--faint);padding:18px 10px 6px;letter-spacing:.04em;text-transform:uppercase}
+.mini-q{display:flex;flex-direction:column;gap:6px;padding:0 4px}
+.mini-q .it{display:flex;gap:9px;align-items:center;padding:6px;border-radius:0;font-size:12.5px;color:var(--muted)}
+.mini-q img{width:30px;height:30px;border-radius:0;object-fit:cover;flex:none}
+.mini-q .bar{height:3px;background:var(--line);border-radius:0;margin-top:5px;overflow:hidden}
+.mini-q .bar i{display:block;height:100%;background:var(--accent);border-radius:0;transition:width .6s}
+.mini-q .t{flex:1;min-width:0}
+.mini-q .t b{display:block;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gpu{margin-top:auto;display:flex;align-items:center;gap:9px;padding:10px;border:1px solid var(--line);border-radius:0;font-size:12.5px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:0;background:var(--ok);flex:none;box-shadow:0 0 0 3px rgba(127,191,138,.15)}
+.dot.busy{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.45}}
+
+/* ---------- main ---------- */
+main{overflow-y:auto;scrollbar-color:var(--line2) transparent}
+.wrap{max-width:1080px;margin:0 auto;padding:0 32px 80px}
+.hero{padding:9vh 0 28px;text-align:center}
+.hero h1{font:600 30px/1.2 var(--display);margin:0 0 8px;letter-spacing:-.01em}
+.hero p{margin:0;color:var(--muted)}
+.view-lib .hero{padding:40px 0 24px;text-align:left;display:flex;align-items:end;justify-content:space-between;gap:20px}
+
+/* composer */
+.composer{max-width:760px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:0;padding:14px;transition:border-color .2s,box-shadow .2s}
+.composer:focus-within{border-color:var(--line2);box-shadow:0 0 0 4px rgba(255,255,255,.02)}
+.composer.drag{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.c-top{display:flex;gap:14px;align-items:flex-start}
+.drop{width:92px;height:92px;flex:none;border-radius:0;border:1.5px dashed var(--line2);display:grid;place-items:center;color:var(--faint);position:relative;overflow:hidden;text-align:center;font-size:11.5px;line-height:1.3;transition:border-color .15s,color .15s}
+.drop:hover{border-color:var(--accent);color:var(--accent)}
+.drop.has{border:0}
+.drop img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.drop .x{position:absolute;top:5px;right:5px;width:22px;height:22px;border-radius:0;background:rgba(0,0,0,.65);display:grid;place-items:center;color:#fff;opacity:0;transition:opacity .15s}
+.drop.has:hover .x{opacity:1}
+textarea{flex:1;min-height:92px;max-height:260px;resize:none;background:none;border:0;outline:0;padding:6px 4px;font-size:15px;line-height:1.5}
+textarea::placeholder{color:var(--faint)}
+.c-bar{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+.seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:0;padding:3px}
+.seg button{padding:5px 11px;border-radius:0;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.seg button:hover{color:var(--text)}
+.seg button.on{background:var(--panel2);color:var(--text);box-shadow:inset 0 0 0 1px var(--line2)}
+.chip{display:flex;align-items:center;gap:7px;padding:7px 11px;border-radius:0;border:1px solid var(--line);background:var(--bg);color:var(--muted);font-size:13px;position:relative}
+.chip:hover,.chip.on{color:var(--text);border-color:var(--line2)}
+.chip select{appearance:none;background:none;border:0;outline:0;padding:0 2px;cursor:pointer;color:var(--text)}
+.chip select option{background:var(--panel)}
+.spacer{flex:1}
+.est{font-size:12.5px;color:var(--faint);white-space:nowrap}
+.est.long{color:var(--accent)}
+.go{width:40px;height:40px;border-radius:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;transition:transform .12s,opacity .15s}
+.go:hover{transform:translateY(-1px)}
+.go:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.adv{display:none;margin-top:12px;padding-top:14px;border-top:1px solid var(--line);gap:14px 18px;grid-template-columns:150px 200px minmax(0,1fr)}
+.adv.open{display:grid}
+.adv label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}
+.adv input,.adv textarea.neg{background:var(--bg);border:1px solid var(--line);border-radius:0;padding:8px 10px;outline:0;font-size:13px}
+.adv input:focus,.adv textarea.neg:focus{border-color:var(--line2)}
+.adv textarea.neg{min-height:64px;max-height:140px}
+.adv .full{grid-column:1/-1}
+.hint{font-size:11.5px;color:var(--faint)}
+.lora-row{display:flex;align-items:center;gap:10px;padding:6px 0}
+.lora-row input[type=checkbox]{accent-color:var(--accent)}
+.lora-row span{flex:1}
+.lora-row input[type=range]{accent-color:var(--accent);width:120px;padding:0;border:0}
+/* square native controls to match the app icon */
+.lora-row input[type=range]{-webkit-appearance:none;appearance:none;height:3px;background:var(--line2)}
+.lora-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;background:var(--accent);border:0;border-radius:0;cursor:pointer}
+.lora-row input[type=checkbox]{-webkit-appearance:none;appearance:none;width:14px;height:14px;border:1px solid var(--line2);background:transparent;display:grid;place-items:center;cursor:pointer;flex:none}
+.lora-row input[type=checkbox]:checked{background:var(--accent);border-color:var(--accent)}
+.lora-row input[type=checkbox]:checked::after{content:'';width:6px;height:6px;background:var(--accent-ink)}
+::-webkit-scrollbar-thumb{border-radius:0}
+.err{max-width:760px;margin:10px auto 0;color:var(--danger);font-size:13px;min-height:18px;text-align:center}
+
+/* sections */
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;margin:44px 0 14px}
+.sec-h h2{font:600 16px var(--display);margin:0}
+.sec-h a,.link{color:var(--muted);font-size:13px;cursor:pointer;text-decoration:none}
+.sec-h a:hover,.link:hover{color:var(--text)}
+
+/* job cards */
+.jobs{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.job{display:flex;gap:14px;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:0;align-items:center}
+.job .pv{width:64px;height:64px;border-radius:0;overflow:hidden;flex:none;position:relative;background:var(--panel2)}
+.job .pv img{width:100%;height:100%;object-fit:cover}
+.job.running .pv::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.18) 50%,transparent 70%);background-size:250% 100%;animation:sheen 2s linear infinite}
+@keyframes sheen{from{background-position:130% 0}to{background-position:-130% 0}}
+.job .b{flex:1;min-width:0}
+.job .p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.job .m{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:0 10px;margin-top:2px;font-variant-numeric:tabular-nums}
+.job .m span{white-space:nowrap}
+.job .bar{height:4px;background:var(--line);border-radius:0;margin-top:9px;overflow:hidden}
+.job .bar i{display:block;height:100%;background:var(--accent);border-radius:0;transition:width .6s}
+.job.error{border-color:rgba(229,104,79,.4)}
+.job.error .m{color:var(--danger)}
+.ib{width:30px;height:30px;border-radius:0;display:grid;place-items:center;color:var(--muted);flex:none}
+.ib:hover{background:var(--panel2);color:var(--text)}
+
+/* grid */
+.grid{columns:3 260px;column-gap:12px}
+.card{break-inside:avoid;margin-bottom:12px;border-radius:0;overflow:hidden;position:relative;background:var(--panel);cursor:pointer;display:block;width:100%;border:1px solid var(--line)}
+.card video,.card img{display:block;width:100%;height:auto;background:#000}
+.card .ov{position:absolute;inset:auto 0 0 0;padding:28px 12px 10px;background:linear-gradient(transparent,rgba(0,0,0,.78));font-size:12.5px;color:#eee;opacity:0;transition:opacity .2s;text-align:left}
+.card:hover .ov,.card:focus-visible .ov{opacity:1}
+.card .ov p{margin:0 0 4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card .ov span{color:#bbb;font-size:11.5px}
+.card .tag{position:absolute;top:8px;left:8px;padding:2px 7px;border-radius:0;background:rgba(0,0,0,.55);font-size:11px;color:#eee;font-variant-numeric:tabular-nums;backdrop-filter:blur(6px)}
+.empty{border:1px dashed var(--line2);border-radius:0;padding:48px 20px;text-align:center;color:var(--muted)}
+.search{background:var(--panel);border:1px solid var(--line);border-radius:0;padding:8px 12px;outline:0;width:260px}
+.search:focus{border-color:var(--line2)}
+
+/* lightbox */
+.lb{position:fixed;inset:0;background:rgba(8,7,6,.86);backdrop-filter:blur(8px);display:none;z-index:20;padding:28px}
+.lb.open{display:grid;grid-template-columns:1fr 340px;gap:24px}
+.lb .stage{display:grid;place-items:center;min-height:0;min-width:0}
+.lb video{max-width:100%;max-height:calc(100vh - 56px);border-radius:0;background:#000}
+.lb .info{background:var(--panel);border:1px solid var(--line);border-radius:0;padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}
+.lb .info .pr{font-size:14.5px;line-height:1.55;white-space:pre-wrap}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:12.5px}
+.kv dt{color:var(--faint);white-space:nowrap}
+.kv dd{margin:0;font-variant-numeric:tabular-nums}
+.acts{display:grid;gap:8px;margin-top:auto}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 14px;border-radius:0;border:1px solid var(--line2);font-weight:500;text-decoration:none;color:var(--text)}
+.btn:hover{background:var(--panel2)}
+.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.btn.pri:hover{filter:brightness(1.06)}
+.btn.del{color:var(--danger);border-color:transparent}
+.btn.del:hover{background:rgba(229,104,79,.1)}
+.lb .close{position:absolute;top:14px;left:14px;width:38px;height:38px;border-radius:0;background:rgba(255,255,255,.08);display:grid;place-items:center}
+.lb .close:hover{background:rgba(255,255,255,.16)}
+
+.toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--panel2);border:1px solid var(--line2);padding:10px 16px;border-radius:0;opacity:0;transition:.25s;pointer-events:none;z-index:30}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.mock{margin-left:auto;font-size:10.5px;color:var(--accent);border:1px solid var(--accent-soft);padding:1px 6px;border-radius:0}
+
+/* desktop app (Electron) */
+.titlebar{display:none}
+.app-mode .titlebar{display:block;position:fixed;top:0;left:232px;right:150px;height:40px;-webkit-app-region:drag;z-index:5}
+.app-mode .brand{-webkit-app-region:drag}
+.app-mode .lb{padding-top:52px}
+.app-mode .lb .close{top:48px}
+.app-mode.lb-open .titlebar{left:0;right:150px;z-index:25}
+.web-only{} .app-mode .web-only{display:none}
+.app-only{display:none!important} .app-mode .app-only{display:flex!important}
+.ideas{max-width:760px;margin:12px auto 0;display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.idea{padding:6px 12px;border-radius:0;border:1px solid var(--line);color:var(--muted);font-size:12.5px;transition:.15s}
+.idea:hover{color:var(--text);border-color:var(--line2);background:var(--panel)}
+.job .acts2{display:flex;gap:2px}
+.lang{display:flex;align-items:center;gap:2px;padding:8px 8px 0;font-size:11.5px;color:var(--faint);letter-spacing:.04em}
+.lang button{padding:2px 5px;border-radius:0;color:var(--faint)}
+.lang button:hover{color:var(--text)}
+.lang button.on{color:var(--accent)}
+.kbd{font-size:11px;color:var(--faint);border:1px solid var(--line);border-radius:0;padding:0 5px;margin-left:6px}
+
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  .side{display:none}
+  .wrap{padding:0 16px 60px}
+  .lb.open{grid-template-columns:1fr;overflow-y:auto}
+  .adv{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="titlebar"></div>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><img class="mark" src="/static/favicon.png" alt="">Videogen Studio</div>
+    <button class="nav on" data-view="create"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="nav.create">Create</span></button>
+    <button class="nav" data-view="lib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7.5" height="7.5" rx="0"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="0"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="0"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="0"/></svg><span data-i18n="nav.lib">Library</span><span class="count" id="libCount"></span></button>
+    <button class="nav app-only" id="openOut"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span data-i18n="nav.folder">Video folder</span></button>
+    <div class="side-sec" id="qTitle" hidden data-i18n="side.queue">Queue</div>
+    <div class="mini-q" id="miniQ"></div>
+    <div class="gpu"><span class="dot" id="gpuDot"></span><span id="gpuTxt" data-i18n="gpu.free">GPU idle</span><span class="mock" id="mock" hidden>TEST</span></div>
+    <div class="lang" role="group" aria-label="Language" data-i18n-title="lang.title"><button data-lang="en">EN</button><span>|</span><button data-lang="cs">CS</button><span>|</span><button data-lang="de">DE</button><span>|</span><button data-lang="uk">UA</button><span>|</span><button data-lang="es">ES</button></div>
+  </aside>
+
+  <main id="main">
+    <!-- CREATE -->
+    <div class="wrap view-create" id="viewCreate">
+      <div class="hero">
+        <h1 data-i18n="hero.title">What should the image do?</h1>
+        <p data-i18n="hero.sub">Add a photo, describe the motion – Wan 2.2 turns it into a video. Runs locally on your GPU.</p>
+      </div>
+
+      <div class="composer" id="composer">
+        <div class="c-top">
+          <button class="drop" id="drop" title="Add image (or drag &amp; drop / Ctrl+V)" data-i18n-title="drop.title">
+            <span id="dropTxt"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="margin:0 auto 5px"><rect x="3" y="4" width="18" height="16" rx="0"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></svg><span data-i18n="drop.label">Image</span></span>
+            <span class="x" id="dropX" title="Remove" data-i18n-title="drop.remove"><svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.6"><path d="M1 1l8 8M9 1 1 9"/></svg></span>
+          </button>
+          <input type="file" id="file" accept="image/*" hidden>
+          <textarea id="prompt" placeholder="Describe what should happen in the video… (e.g. “she turns to the camera and smiles, hair moving in the wind”)" data-i18n-ph="prompt.ph"></textarea>
+        </div>
+        <div class="c-bar">
+          <div class="seg" id="segRes"><button data-v="480">480p</button><button data-v="720">720p</button></div>
+          <div class="seg" id="segSec"><button data-v="5">5 s</button><button data-v="10">10 s</button><button data-v="15">15 s</button></div>
+          <label class="chip" title="Aspect ratio (the image is center-cropped)" data-i18n-title="aspect.title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="6" width="16" height="12" rx="0"/></svg>
+            <select id="aspect"><option value="auto" data-i18n="aspect.auto">Match image</option><option>16:9</option><option>9:16</option><option>1:1</option><option>3:2</option><option>2:3</option><option>4:5</option></select>
+          </label>
+          <button class="chip" id="advBtn" title="Advanced" data-i18n-title="adv.title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span data-i18n="adv.title">Advanced</span></button>
+          <span class="spacer"></span>
+          <span class="est" id="est"></span>
+          <button class="go" id="go" title="Generate (Ctrl+Enter)" aria-label="Generate" data-i18n-title="go.title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+        </div>
+        <div class="adv" id="adv">
+          <label><span data-i18n="adv.steps">Steps</span><input type="number" id="steps" min="1" max="50" value="4"><span class="hint" data-i18n="adv.stepsHint">4 = fast. Above 8 disables the speed-up (2 passes per step; 50 steps ≈ 25× slower).</span></label>
+          <label><span data-i18n="adv.seed">Seed</span><input type="text" id="seed" placeholder="random" data-i18n-ph="adv.seedPh" inputmode="numeric"><span class="hint" data-i18n="adv.seedHint">Same seed + prompt = same video.</span></label>
+          <div id="loraBox"></div>
+          <label class="full"><span data-i18n="adv.neg">Negative prompt</span><textarea class="neg" id="neg" placeholder="Empty = official Wan negative prompt" data-i18n-ph="adv.negPh"></textarea></label>
+          
+        </div>
+      </div>
+      <div class="ideas" id="ideas"></div>
+      <div class="err" id="err"></div>
+
+      <div id="jobsWrap" hidden>
+        <div class="sec-h"><h2 data-i18n="jobs.title">In progress</h2></div>
+        <div class="jobs" id="jobs"></div>
+      </div>
+
+      <div class="sec-h"><h2 data-i18n="recent.title">Recent videos</h2><a data-view="lib" id="allLink" data-i18n="recent.all">Full library →</a></div>
+      <div class="grid" id="recent"></div>
+    </div>
+
+    <!-- LIBRARY -->
+    <div class="wrap view-lib" id="viewLib" hidden>
+      <div class="hero"><div><h1 data-i18n="nav.lib">Library</h1><p id="libSub"></p></div><input class="search" id="q" placeholder="Search prompts…" data-i18n-ph="lib.search"></div>
+      <div class="grid" id="lib"></div>
+    </div>
+  </main>
+</div>
+
+<div class="lb" id="lb">
+  <button class="close" id="lbClose" title="Close (Esc)" data-i18n-title="lb.close"><svg width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.8"><path d="M1 1l12 12M13 1 1 13"/></svg></button>
+  <div class="stage"><video id="lbVid" controls loop autoplay playsinline></video></div>
+  <div class="info">
+    <div class="pr" id="lbPrompt"></div>
+    <dl class="kv" id="lbKv"></dl>
+    <div class="hint" id="lbHint"></div>
+    <div class="acts">
+      <button class="btn pri" id="lbAgain" data-i18n="lb.again">Again with a new seed</button>
+      <button class="btn" id="lbEdit" data-i18n="lb.edit">Edit prompt</button>
+      <button class="btn app-only" id="lbSave" data-i18n="lb.save">Save as…</button>
+      <button class="btn app-only" id="lbShow" data-i18n="lb.show">Show in folder</button>
+      <a class="btn web-only" id="lbDl" download data-i18n="lb.download">Download MP4</a>
+      <button class="btn del" id="lbDel" data-i18n="lb.delete">Delete</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- i18n ---------- */
+const LANGS = ['en', 'cs', 'de', 'uk', 'es'];
+const LANG = (()=>{
+  try { const s = localStorage.getItem('lang'); if (LANGS.includes(s)) return s; } catch {}
+  const nav = (navigator.language || '').toLowerCase().slice(0, 2);
+  return LANGS.includes(nav) ? nav : 'en';
+})();
+const LOCALE = {en:'en-GB', cs:'cs-CZ', de:'de-DE', uk:'uk-UA', es:'es-ES'}[LANG];
+const I18N = {
+  en: {
+    'nav.create': 'Create', 'nav.lib': 'Library', 'nav.folder': 'Video folder', 'side.queue': 'Queue',
+    'gpu.free': 'GPU idle', 'gpu.busy': 'Generating · {0}', 'status.offline': 'Server is not running', 'lang.title': 'Language',
+    'hero.title': 'What should the image do?',
+    'hero.sub': 'Add a photo, describe the motion – Wan 2.2 turns it into a video. Runs locally on your GPU.',
+    'drop.title': 'Add image (or drag & drop / Ctrl+V)', 'drop.label': 'Image', 'drop.remove': 'Remove',
+    'prompt.ph': 'Describe what should happen in the video… (e.g. “she turns to the camera and smiles, hair moving in the wind”)',
+    'aspect.title': 'Aspect ratio (the image is center-cropped)', 'aspect.auto': 'Match image',
+    'adv.title': 'Advanced', 'adv.steps': 'Steps', 'adv.stepsHint': '4 = fast. Above 8 disables the speed-up (2 passes per step; 50 steps ≈ 25× slower).',
+    'adv.seed': 'Seed', 'adv.seedPh': 'random', 'adv.seedHint': 'Same seed + prompt = same video.',
+    'adv.neg': 'Negative prompt', 'adv.negPh': 'Empty = official Wan negative prompt',
+    'loras.label': 'LoRAs',
+    'loras.none': 'None. Put pairs of <i>…high…</i> and <i>…low…</i> files (.safetensors) into the models/loras folder.',
+    'go.title': 'Generate (Ctrl+Enter)', 'go.needBoth': 'Add an image and describe the motion', 'go.needImage': 'Add an image',
+    'go.needPrompt': 'Describe what should happen',
+    'est.approx': '~{0}', 'est.long': 'Long render – 480p is roughly 5× faster than 720p. ',
+    'est.tip': 'Estimate based on video size and your finished videos',
+    'confirm.long': 'This video will take about {0} and keep the GPU busy the whole time.\n\n480p is about 5× faster. Start anyway?',
+    'err.server': 'Server error', 'toast.queued': 'Added to queue', 'toast.generating': 'Generating…', 'toast.saved': 'Saved',
+    'toast.done': 'Video is ready', 'toast.deleted': 'Deleted', 'toast.cantDelete': 'Can\'t delete',
+    'idea.smile': 'Smile at camera', 'idea.wind': 'Wind in hair', 'idea.pushIn': 'Camera push-in', 'idea.orbit': 'Orbit camera',
+    'idea.blink': 'Blink', 'idea.walk': 'Walk', 'idea.bg': 'Living background',
+    'jobs.title': 'In progress', 'recent.title': 'Recent videos', 'recent.all': 'Full library →', 'lib.search': 'Search prompts…',
+    'card.partial': 'incomplete', 'empty.none': 'Nothing found.', 'empty.lib': 'Nothing here yet.',
+    'empty.recent': 'Your videos will appear here. Start above – add an image and describe the motion.',
+    'n.video': {one:'video', other:'videos'}, 'pct': '{0}%',
+    'dur.h': 'h', 'dur.min': 'min', 'dur.s': 's',
+    'job.error': 'Error', 'job.cancelled': 'Cancelled', 'job.queued': 'Queued', 'job.startsIn': 'starts in ~{0} · ',
+    'job.takes': 'takes ~{0}', 'job.left': ' · ~{0} left', 'job.cancel': 'Cancel', 'job.log': 'Open log',
+    'job.playPartial': 'Play the finished part', 'job.dismiss': 'Hide', 'job.partialPrompt': '(incomplete video – generation failed)',
+    'job.waiting': 'waiting', 'confirm.cancel': 'Cancel generation?',
+    'lb.close': 'Close (Esc)', 'lb.again': 'Again with a new seed', 'lb.edit': 'Edit prompt', 'lb.save': 'Save as…',
+    'lb.show': 'Show in folder', 'lb.download': 'Download MP4', 'lb.delete': 'Delete', 'lb.noPrompt': '(no prompt)',
+    'lb.res': 'Resolution', 'lb.len': 'Length', 'lb.status': 'Status', 'lb.aspect': 'Aspect', 'lb.steps': 'Steps', 'lb.seed': 'Seed',
+    'lb.loras': 'LoRAs', 'lb.took': 'Render time', 'lb.created': 'Created', 'lb.file': 'File',
+    'lb.incomplete': 'incomplete – {0}', 'lb.failed': 'generation failed', 'lb.matchImage': 'match image',
+    'lb.hintNav': '← → next video · Space pause · Esc close', 'lb.hint': 'Space pause · Esc close',
+    'confirm.delete': 'Delete this video permanently?',
+  },
+  cs: {
+    'nav.create': 'Vytvořit', 'nav.lib': 'Knihovna', 'nav.folder': 'Složka s videi', 'side.queue': 'Fronta',
+    'gpu.free': 'GPU volná', 'gpu.busy': 'Generuji · {0}', 'status.offline': 'Server neběží', 'lang.title': 'Jazyk',
+    'hero.title': 'Co má obrázek udělat?',
+    'hero.sub': 'Přidej fotku, popiš pohyb – Wan 2.2 z ní udělá video. Běží lokálně na tvé grafice.',
+    'drop.title': 'Přidat obrázek (nebo přetáhnout / Ctrl+V)', 'drop.label': 'Obrázek', 'drop.remove': 'Odebrat',
+    'prompt.ph': 'Popiš, co se má ve videu dít… (nejlépe anglicky, např. „she turns to the camera and smiles, hair moving in the wind“)',
+    'aspect.title': 'Poměr stran (obrázek se ořízne na střed)', 'aspect.auto': 'Podle obrázku',
+    'adv.title': 'Pokročilé', 'adv.steps': 'Kroky', 'adv.stepsHint': '4 = rychlé. Nad 8 vypne zrychlení (2 průchody na krok; 50 kroků ≈ 25× déle).',
+    'adv.seed': 'Seed', 'adv.seedPh': 'náhodný', 'adv.seedHint': 'Stejný seed + zadání = stejné video.',
+    'adv.neg': 'Negativní prompt', 'adv.negPh': 'Prázdné = oficiální Wan negativní prompt',
+    'loras.label': 'LoRy',
+    'loras.none': 'Žádné. Dvojice souborů <i>…high…</i> a <i>…low…</i> (.safetensors) vlož do složky models/loras.',
+    'go.title': 'Generovat (Ctrl+Enter)', 'go.needBoth': 'Přidej obrázek a popiš pohyb', 'go.needImage': 'Přidej obrázek',
+    'go.needPrompt': 'Popiš, co se má dít',
+    'est.approx': 'cca {0}', 'est.long': 'Dlouhé generování – 480p je zhruba 5× rychlejší než 720p. ',
+    'est.tip': 'Odhad podle velikosti videa a tvých dokončených videí',
+    'confirm.long': 'Tohle video bude trvat zhruba {0} a celou dobu vytíží grafiku.\n\n480p je asi 5× rychlejší. Opravdu spustit?',
+    'err.server': 'Chyba serveru', 'toast.queued': 'Přidáno do fronty', 'toast.generating': 'Generuji…', 'toast.saved': 'Uloženo',
+    'toast.done': 'Video je hotové', 'toast.deleted': 'Smazáno', 'toast.cantDelete': 'Nejde smazat',
+    'idea.smile': 'Úsměv do kamery', 'idea.wind': 'Vítr ve vlasech', 'idea.pushIn': 'Nájezd kamery', 'idea.orbit': 'Kamera kolem',
+    'idea.blink': 'Mrknutí', 'idea.walk': 'Chůze', 'idea.bg': 'Živé pozadí',
+    'jobs.title': 'Právě se tvoří', 'recent.title': 'Poslední videa', 'recent.all': 'Celá knihovna →', 'lib.search': 'Hledat v promptech…',
+    'card.partial': 'neúplné', 'empty.none': 'Nic nenalezeno.', 'empty.lib': 'Zatím tu nic není.',
+    'empty.recent': 'Tady se objeví tvoje videa. Začni nahoře – přidej obrázek a popiš pohyb.',
+    'n.video': {one:'video', few:'videa', other:'videí'}, 'pct': '{0} %',
+    'dur.h': 'h', 'dur.min': 'min', 'dur.s': 's',
+    'job.error': 'Chyba', 'job.cancelled': 'Zrušeno', 'job.queued': 'Ve frontě', 'job.startsIn': 'začne za ~{0} · ',
+    'job.takes': 'trvá ~{0}', 'job.left': ' · zbývá ~{0}', 'job.cancel': 'Zrušit', 'job.log': 'Otevřít log',
+    'job.playPartial': 'Přehrát hotovou část', 'job.dismiss': 'Skrýt', 'job.partialPrompt': '(neúplné video – generování selhalo)',
+    'job.waiting': 'čeká', 'confirm.cancel': 'Zrušit generování?',
+    'lb.close': 'Zavřít (Esc)', 'lb.again': 'Znovu s novým seedem', 'lb.edit': 'Upravit zadání', 'lb.save': 'Uložit jako…',
+    'lb.show': 'Ukázat ve složce', 'lb.download': 'Stáhnout MP4', 'lb.delete': 'Smazat', 'lb.noPrompt': '(bez zadání)',
+    'lb.res': 'Rozlišení', 'lb.len': 'Délka', 'lb.status': 'Stav', 'lb.aspect': 'Poměr', 'lb.steps': 'Kroky', 'lb.seed': 'Seed',
+    'lb.loras': 'LoRy', 'lb.took': 'Generováno', 'lb.created': 'Vytvořeno', 'lb.file': 'Soubor',
+    'lb.incomplete': 'neúplné – {0}', 'lb.failed': 'generování selhalo', 'lb.matchImage': 'podle obrázku',
+    'lb.hintNav': '← → další video · mezerník pauza · Esc zavřít', 'lb.hint': 'Mezerník pauza · Esc zavřít',
+    'confirm.delete': 'Smazat video natrvalo?',
+  },
+  de: {
+    'nav.create': 'Erstellen', 'nav.lib': 'Bibliothek', 'nav.folder': 'Videoordner', 'side.queue': 'Warteschlange',
+    'gpu.free': 'GPU frei', 'gpu.busy': 'Generiere · {0}', 'status.offline': 'Server läuft nicht', 'lang.title': 'Sprache',
+    'hero.title': 'Was soll das Bild tun?',
+    'hero.sub': 'Foto hinzufügen, Bewegung beschreiben – Wan 2.2 macht daraus ein Video. Läuft lokal auf deiner GPU.',
+    'drop.title': 'Bild hinzufügen (oder hineinziehen / Strg+V)', 'drop.label': 'Bild', 'drop.remove': 'Entfernen',
+    'prompt.ph': 'Beschreibe, was im Video passieren soll… (am besten auf Englisch, z. B. „she turns to the camera and smiles, hair moving in the wind“)',
+    'aspect.title': 'Seitenverhältnis (das Bild wird mittig zugeschnitten)', 'aspect.auto': 'Wie Bild',
+    'adv.title': 'Erweitert', 'adv.steps': 'Schritte', 'adv.stepsHint': '4 = schnell. Über 8 wird die Beschleunigung deaktiviert (2 Durchläufe pro Schritt; 50 Schritte ≈ 25× langsamer).',
+    'adv.seed': 'Seed', 'adv.seedPh': 'zufällig', 'adv.seedHint': 'Gleicher Seed + Prompt = gleiches Video.',
+    'adv.neg': 'Negativ-Prompt', 'adv.negPh': 'Leer = offizieller Wan-Negativ-Prompt',
+    'loras.label': 'LoRAs',
+    'loras.none': 'Keine. Lege Paare aus <i>…high…</i>- und <i>…low…</i>-Dateien (.safetensors) in den Ordner models/loras.',
+    'go.title': 'Generieren (Strg+Enter)', 'go.needBoth': 'Füge ein Bild hinzu und beschreibe die Bewegung', 'go.needImage': 'Füge ein Bild hinzu',
+    'go.needPrompt': 'Beschreibe, was passieren soll',
+    'est.approx': 'ca. {0}', 'est.long': 'Lange Generierung – 480p ist etwa 5× schneller als 720p. ',
+    'est.tip': 'Schätzung anhand der Videogröße und deiner fertigen Videos',
+    'confirm.long': 'Dieses Video dauert etwa {0} und lastet die GPU die ganze Zeit aus.\n\n480p ist etwa 5× schneller. Trotzdem starten?',
+    'err.server': 'Serverfehler', 'toast.queued': 'Zur Warteschlange hinzugefügt', 'toast.generating': 'Generiere…', 'toast.saved': 'Gespeichert',
+    'toast.done': 'Video ist fertig', 'toast.deleted': 'Gelöscht', 'toast.cantDelete': 'Löschen nicht möglich',
+    'idea.smile': 'Lächeln in die Kamera', 'idea.wind': 'Wind im Haar', 'idea.pushIn': 'Kamerafahrt nach vorn', 'idea.orbit': 'Kamera umkreist',
+    'idea.blink': 'Blinzeln', 'idea.walk': 'Gehen', 'idea.bg': 'Lebendiger Hintergrund',
+    'jobs.title': 'In Arbeit', 'recent.title': 'Neueste Videos', 'recent.all': 'Ganze Bibliothek →', 'lib.search': 'Prompts durchsuchen…',
+    'card.partial': 'unvollständig', 'empty.none': 'Nichts gefunden.', 'empty.lib': 'Noch nichts hier.',
+    'empty.recent': 'Hier erscheinen deine Videos. Fang oben an – Bild hinzufügen und Bewegung beschreiben.',
+    'n.video': {one:'Video', other:'Videos'}, 'pct': '{0} %',
+    'dur.h': 'h', 'dur.min': 'min', 'dur.s': 's',
+    'job.error': 'Fehler', 'job.cancelled': 'Abgebrochen', 'job.queued': 'In Warteschlange', 'job.startsIn': 'startet in ~{0} · ',
+    'job.takes': 'dauert ~{0}', 'job.left': ' · noch ~{0}', 'job.cancel': 'Abbrechen', 'job.log': 'Log öffnen',
+    'job.playPartial': 'Fertigen Teil abspielen', 'job.dismiss': 'Ausblenden', 'job.partialPrompt': '(unvollständiges Video – Generierung fehlgeschlagen)',
+    'job.waiting': 'wartet', 'confirm.cancel': 'Generierung abbrechen?',
+    'lb.close': 'Schließen (Esc)', 'lb.again': 'Nochmal mit neuem Seed', 'lb.edit': 'Prompt bearbeiten', 'lb.save': 'Speichern unter…',
+    'lb.show': 'Im Ordner anzeigen', 'lb.download': 'MP4 herunterladen', 'lb.delete': 'Löschen', 'lb.noPrompt': '(kein Prompt)',
+    'lb.res': 'Auflösung', 'lb.len': 'Länge', 'lb.status': 'Status', 'lb.aspect': 'Format', 'lb.steps': 'Schritte', 'lb.seed': 'Seed',
+    'lb.loras': 'LoRAs', 'lb.took': 'Renderzeit', 'lb.created': 'Erstellt', 'lb.file': 'Datei',
+    'lb.incomplete': 'unvollständig – {0}', 'lb.failed': 'Generierung fehlgeschlagen', 'lb.matchImage': 'wie Bild',
+    'lb.hintNav': '← → nächstes Video · Leertaste Pause · Esc schließen', 'lb.hint': 'Leertaste Pause · Esc schließen',
+    'confirm.delete': 'Dieses Video endgültig löschen?',
+  },
+  uk: {
+    'nav.create': 'Створити', 'nav.lib': 'Бібліотека', 'nav.folder': 'Тека з відео', 'side.queue': 'Черга',
+    'gpu.free': 'GPU вільна', 'gpu.busy': 'Генерую · {0}', 'status.offline': 'Сервер не запущено', 'lang.title': 'Мова',
+    'hero.title': 'Що має зробити зображення?',
+    'hero.sub': 'Додайте фото, опишіть рух – Wan 2.2 перетворить його на відео. Працює локально на вашій відеокарті.',
+    'drop.title': 'Додати зображення (або перетягнути / Ctrl+V)', 'drop.label': 'Зображення', 'drop.remove': 'Прибрати',
+    'prompt.ph': 'Опишіть, що має відбуватися у відео… (краще англійською, напр. «she turns to the camera and smiles, hair moving in the wind»)',
+    'aspect.title': 'Співвідношення сторін (зображення обрізається по центру)', 'aspect.auto': 'За зображенням',
+    'adv.title': 'Додатково', 'adv.steps': 'Кроки', 'adv.stepsHint': '4 = швидко. Понад 8 вимикає прискорення (2 проходи на крок; 50 кроків ≈ 25× повільніше).',
+    'adv.seed': 'Seed', 'adv.seedPh': 'випадковий', 'adv.seedHint': 'Той самий seed + промпт = те саме відео.',
+    'adv.neg': 'Негативний промпт', 'adv.negPh': 'Порожньо = офіційний негативний промпт Wan',
+    'loras.label': 'LoRA',
+    'loras.none': 'Немає. Покладіть пари файлів <i>…high…</i> і <i>…low…</i> (.safetensors) у теку models/loras.',
+    'go.title': 'Згенерувати (Ctrl+Enter)', 'go.needBoth': 'Додайте зображення й опишіть рух', 'go.needImage': 'Додайте зображення',
+    'go.needPrompt': 'Опишіть, що має відбуватися',
+    'est.approx': '≈ {0}', 'est.long': 'Довга генерація – 480p приблизно 5× швидше, ніж 720p. ',
+    'est.tip': 'Оцінка за розміром відео та вашими готовими відео',
+    'confirm.long': 'Це відео триватиме приблизно {0} і весь цей час навантажуватиме відеокарту.\n\n480p приблизно 5× швидше. Все одно запустити?',
+    'err.server': 'Помилка сервера', 'toast.queued': 'Додано до черги', 'toast.generating': 'Генерую…', 'toast.saved': 'Збережено',
+    'toast.done': 'Відео готове', 'toast.deleted': 'Видалено', 'toast.cantDelete': 'Не вдалося видалити',
+    'idea.smile': 'Усмішка в камеру', 'idea.wind': 'Вітер у волоссі', 'idea.pushIn': 'Наїзд камери', 'idea.orbit': 'Камера навколо',
+    'idea.blink': 'Кліпання', 'idea.walk': 'Хода', 'idea.bg': 'Живий фон',
+    'jobs.title': 'Зараз створюється', 'recent.title': 'Останні відео', 'recent.all': 'Уся бібліотека →', 'lib.search': 'Пошук у промптах…',
+    'card.partial': 'неповне', 'empty.none': 'Нічого не знайдено.', 'empty.lib': 'Тут поки нічого немає.',
+    'empty.recent': 'Тут з’являться ваші відео. Почніть угорі – додайте зображення й опишіть рух.',
+    'n.video': {one:'відео', few:'відео', many:'відео', other:'відео'}, 'pct': '{0} %',
+    'dur.h': 'год', 'dur.min': 'хв', 'dur.s': 'с',
+    'job.error': 'Помилка', 'job.cancelled': 'Скасовано', 'job.queued': 'У черзі', 'job.startsIn': 'почнеться за ~{0} · ',
+    'job.takes': 'триватиме ~{0}', 'job.left': ' · залишилось ~{0}', 'job.cancel': 'Скасувати', 'job.log': 'Відкрити лог',
+    'job.playPartial': 'Відтворити готову частину', 'job.dismiss': 'Сховати', 'job.partialPrompt': '(неповне відео – генерація не вдалася)',
+    'job.waiting': 'очікує', 'confirm.cancel': 'Скасувати генерацію?',
+    'lb.close': 'Закрити (Esc)', 'lb.again': 'Ще раз з новим seed', 'lb.edit': 'Редагувати промпт', 'lb.save': 'Зберегти як…',
+    'lb.show': 'Показати в теці', 'lb.download': 'Завантажити MP4', 'lb.delete': 'Видалити', 'lb.noPrompt': '(без промпту)',
+    'lb.res': 'Роздільність', 'lb.len': 'Тривалість', 'lb.status': 'Стан', 'lb.aspect': 'Пропорції', 'lb.steps': 'Кроки', 'lb.seed': 'Seed',
+    'lb.loras': 'LoRA', 'lb.took': 'Час генерації', 'lb.created': 'Створено', 'lb.file': 'Файл',
+    'lb.incomplete': 'неповне – {0}', 'lb.failed': 'генерація не вдалася', 'lb.matchImage': 'за зображенням',
+    'lb.hintNav': '← → наступне відео · пробіл пауза · Esc закрити', 'lb.hint': 'Пробіл пауза · Esc закрити',
+    'confirm.delete': 'Видалити це відео назавжди?',
+  },
+  es: {
+    'nav.create': 'Crear', 'nav.lib': 'Biblioteca', 'nav.folder': 'Carpeta de vídeos', 'side.queue': 'Cola',
+    'gpu.free': 'GPU libre', 'gpu.busy': 'Generando · {0}', 'status.offline': 'El servidor no está en marcha', 'lang.title': 'Idioma',
+    'hero.title': '¿Qué debe hacer la imagen?',
+    'hero.sub': 'Añade una foto, describe el movimiento – Wan 2.2 lo convierte en vídeo. Funciona en local con tu GPU.',
+    'drop.title': 'Añadir imagen (o arrastrar / Ctrl+V)', 'drop.label': 'Imagen', 'drop.remove': 'Quitar',
+    'prompt.ph': 'Describe qué debe pasar en el vídeo… (mejor en inglés, p. ej. «she turns to the camera and smiles, hair moving in the wind»)',
+    'aspect.title': 'Relación de aspecto (la imagen se recorta al centro)', 'aspect.auto': 'Como la imagen',
+    'adv.title': 'Avanzado', 'adv.steps': 'Pasos', 'adv.stepsHint': '4 = rápido. Más de 8 desactiva la aceleración (2 pasadas por paso; 50 pasos ≈ 25× más lento).',
+    'adv.seed': 'Semilla', 'adv.seedPh': 'aleatoria', 'adv.seedHint': 'Misma semilla + prompt = mismo vídeo.',
+    'adv.neg': 'Prompt negativo', 'adv.negPh': 'Vacío = prompt negativo oficial de Wan',
+    'loras.label': 'LoRAs',
+    'loras.none': 'Ninguna. Coloca pares de archivos <i>…high…</i> y <i>…low…</i> (.safetensors) en la carpeta models/loras.',
+    'go.title': 'Generar (Ctrl+Enter)', 'go.needBoth': 'Añade una imagen y describe el movimiento', 'go.needImage': 'Añade una imagen',
+    'go.needPrompt': 'Describe qué debe pasar',
+    'est.approx': '~{0}', 'est.long': 'Generación larga – 480p es unas 5× más rápida que 720p. ',
+    'est.tip': 'Estimación según el tamaño del vídeo y tus vídeos terminados',
+    'confirm.long': 'Este vídeo tardará unos {0} y mantendrá la GPU ocupada todo el tiempo.\n\n480p es unas 5× más rápida. ¿Empezar de todos modos?',
+    'err.server': 'Error del servidor', 'toast.queued': 'Añadido a la cola', 'toast.generating': 'Generando…', 'toast.saved': 'Guardado',
+    'toast.done': 'El vídeo está listo', 'toast.deleted': 'Eliminado', 'toast.cantDelete': 'No se puede eliminar',
+    'idea.smile': 'Sonrisa a cámara', 'idea.wind': 'Viento en el pelo', 'idea.pushIn': 'Acercamiento de cámara', 'idea.orbit': 'Cámara en órbita',
+    'idea.blink': 'Parpadeo', 'idea.walk': 'Caminar', 'idea.bg': 'Fondo con vida',
+    'jobs.title': 'En curso', 'recent.title': 'Vídeos recientes', 'recent.all': 'Toda la biblioteca →', 'lib.search': 'Buscar en los prompts…',
+    'card.partial': 'incompleto', 'empty.none': 'No se encontró nada.', 'empty.lib': 'Aún no hay nada.',
+    'empty.recent': 'Aquí aparecerán tus vídeos. Empieza arriba: añade una imagen y describe el movimiento.',
+    'n.video': {one:'vídeo', other:'vídeos'}, 'pct': '{0} %',
+    'dur.h': 'h', 'dur.min': 'min', 'dur.s': 's',
+    'job.error': 'Error', 'job.cancelled': 'Cancelado', 'job.queued': 'En cola', 'job.startsIn': 'empieza en ~{0} · ',
+    'job.takes': 'tarda ~{0}', 'job.left': ' · quedan ~{0}', 'job.cancel': 'Cancelar', 'job.log': 'Abrir registro',
+    'job.playPartial': 'Reproducir la parte terminada', 'job.dismiss': 'Ocultar', 'job.partialPrompt': '(vídeo incompleto – la generación falló)',
+    'job.waiting': 'en espera', 'confirm.cancel': '¿Cancelar la generación?',
+    'lb.close': 'Cerrar (Esc)', 'lb.again': 'Otra vez con nueva semilla', 'lb.edit': 'Editar prompt', 'lb.save': 'Guardar como…',
+    'lb.show': 'Mostrar en la carpeta', 'lb.download': 'Descargar MP4', 'lb.delete': 'Eliminar', 'lb.noPrompt': '(sin prompt)',
+    'lb.res': 'Resolución', 'lb.len': 'Duración', 'lb.status': 'Estado', 'lb.aspect': 'Formato', 'lb.steps': 'Pasos', 'lb.seed': 'Semilla',
+    'lb.loras': 'LoRAs', 'lb.took': 'Tiempo de render', 'lb.created': 'Creado', 'lb.file': 'Archivo',
+    'lb.incomplete': 'incompleto – {0}', 'lb.failed': 'la generación falló', 'lb.matchImage': 'como la imagen',
+    'lb.hintNav': '← → siguiente vídeo · Espacio pausa · Esc cerrar', 'lb.hint': 'Espacio pausa · Esc cerrar',
+    'confirm.delete': '¿Eliminar este vídeo definitivamente?',
+  },
+};
+function t(key, ...args){
+  const s = I18N[LANG]?.[key] ?? I18N.en[key] ?? key;
+  return args.length ? s.replace(/\{(\d+)\}/g, (m, i) => args[i] ?? '') : s;
+}
+/* server values are either plain strings or {en, cs, de, uk, es} objects */
+const tx = v => v && typeof v === 'object' ? (v[LANG] || v.en || '') : (v ?? '');
+document.documentElement.lang = LANG;
+document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
+document.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = t(el.dataset.i18nPh));
+document.querySelectorAll('[data-i18n-title]').forEach(el => {
+  const v = t(el.dataset.i18nTitle);
+  el.title = v; if (el.hasAttribute('aria-label')) el.setAttribute('aria-label', v);
+});
+document.querySelectorAll('#segSec button').forEach(b => b.textContent = `${b.dataset.v} ${t('dur.s')}`);
+document.querySelectorAll('[data-lang]').forEach(b => {
+  b.classList.toggle('on', b.dataset.lang === LANG);
+  b.onclick = () => { try { localStorage.setItem('lang', b.dataset.lang); } catch {} location.reload(); };
+});
+
+const $ = s => document.querySelector(s);
+const store = {get(k,d){try{const v=localStorage.getItem('vg_'+k);return v==null?d:JSON.parse(v)}catch{return d}},
+               set(k,v){try{localStorage.setItem('vg_'+k,JSON.stringify(v))}catch{}}};
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* "1 h 5 min" / "5 min" / "40 s" – unit labels from the dictionary (uk uses Cyrillic ones) */
+const fmtDur = s => { if (s == null) return ''; s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor(s%3600/60);
+  const H = t('dur.h'), M = t('dur.min'), S = t('dur.s');
+  return h ? `${h} ${H} ${m} ${M}` : m ? `${m} ${M}` : `${s} ${S}`; };
+const fmtDate = ts => new Date(ts*1000).toLocaleString(LOCALE, {day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'});
+const pct = x => t('pct', Math.round(x*100));
+
+const app = window.studio?.isApp;
+if (app) document.documentElement.classList.add('app-mode');
+let state = {jobs:[], videos:[], loras:[], model:null};
+const api = (path, body) => fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+/* plural forms are {one, few, many, other} objects in the dictionary, picked by Intl.PluralRules;
+   a missing category falls back to 'other' (cs: 0 and 5+ are 'other', 'many' is only for decimals) */
+const PR = new Intl.PluralRules(LOCALE);
+const plural = (n, key) => {
+  const f = I18N[LANG]?.[key] ?? I18N.en[key];
+  return `${n} ${f[PR.select(n)] ?? f.other}`;
+};
+let opts = Object.assign({res:480, sec:5, aspect:'auto', steps:4}, store.get('opts', {}));
+let image = null;      // {data} for a new upload, or {upload, url} for a reused one
+let loraSel = store.get('loras', {});   // id -> {on, w}
+let current = null;    // video shown in the lightbox
+
+/* ---------- views ---------- */
+function show(view){
+  $('#viewCreate').hidden = view !== 'create';
+  $('#viewLib').hidden = view !== 'lib';
+  document.querySelectorAll('.nav').forEach(b => b.classList.toggle('on', b.dataset.view === view));
+  $('#main').scrollTop = 0;
+  store.set('view', view);
+}
+document.querySelectorAll('[data-view]').forEach(b => b.onclick = e => { e.preventDefault(); show(b.dataset.view); });
+
+/* ---------- composer ---------- */
+function segs(){
+  for (const [id, key] of [['#segRes','res'],['#segSec','sec']])
+    document.querySelectorAll(id+' button').forEach(b => {
+      b.classList.toggle('on', +b.dataset.v === opts[key]);
+      b.onclick = () => { opts[key] = +b.dataset.v; saveOpts(); };
+    });
+  $('#aspect').value = opts.aspect; $('#steps').value = opts.steps;
+  const est = estimate();
+  $('#est').textContent = est ? t('est.approx', fmtDur(est)) : '';
+  $('#est').classList.toggle('long', est > 3600);
+  $('#est').title = est ? (est > 3600 ? t('est.long') : '') + t('est.tip') : '';
+  const why = !image && !$('#prompt').value.trim() ? t('go.needBoth') : !image ? t('go.needImage') : !$('#prompt').value.trim() ? t('go.needPrompt') : '';
+  $('#go').disabled = !!why;
+  $('#go').title = why || t('go.title');
+}
+function saveOpts(){ store.set('opts', opts); segs(); }
+/* time estimate – same model as server.py (attention grows with the square of the token count) */
+const RATIOS = {'16:9':16/9, '9:16':9/16, '1:1':1, '3:2':3/2, '2:3':2/3, '4:5':4/5};
+function outSize(w, h, aspect, res){
+  if (RATIOS[aspect]) { const r = RATIOS[aspect]; if (w/h > r) w = Math.round(h*r); else h = Math.round(w/r); }
+  const area = res === 480 ? 480*832 : 720*1280, ar = h / w;
+  return [Math.floor(Math.round(Math.sqrt(area/ar))/16)*16, Math.floor(Math.round(Math.sqrt(area*ar))/16)*16];
+}
+function estimate(){
+  const m = state.model; if (!m || !image?.w) return null;
+  const [w, h] = outSize(image.w, image.h, opts.aspect, opts.res);
+  const n = Math.floor(w/16) * Math.floor(h/16) * 21, segN = Math.ceil(opts.sec / m.seg);
+  const step = (m.a*n + m.b*n*n) * (opts.steps <= 8 ? 1 : 2);
+  return (m.load + segN * (opts.steps * step + m.dec * n)) * m.k;
+}
+$('#aspect').onchange = e => { opts.aspect = e.target.value; saveOpts(); };
+$('#steps').onchange = e => { opts.steps = Math.min(50, Math.max(1, +e.target.value || 4)); saveOpts(); };
+$('#advBtn').onclick = () => { $('#adv').classList.toggle('open'); $('#advBtn').classList.toggle('on'); };
+$('#prompt').addEventListener('input', e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; store.set('draft', e.target.value); segs(); });
+$('#prompt').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submit(); });
+$('#prompt').value = store.get('draft', '');
+
+function setImage(img){
+  image = img;
+  const d = $('#drop');
+  d.classList.toggle('has', !!img);
+  d.querySelector('img')?.remove();
+  $('#dropTxt').hidden = !!img;
+  if (img){
+    const el = document.createElement('img'); el.alt = '';
+    el.onload = () => { if (image === img) { img.w = el.naturalWidth; img.h = el.naturalHeight; segs(); } };
+    el.src = img.data || img.url; d.prepend(el);
+  }
+  segs();
+}
+function readFile(f){
+  if (!f || !f.type.startsWith('image/')) return;
+  const r = new FileReader(); r.onload = () => setImage({data: r.result}); r.readAsDataURL(f);
+}
+$('#drop').onclick = e => { if (e.target.closest('#dropX')) { setImage(null); return; } $('#file').click(); };
+$('#file').onchange = e => { readFile(e.target.files[0]); e.target.value = ''; };
+const comp = $('#composer');
+['dragenter','dragover'].forEach(t => comp.addEventListener(t, e => { e.preventDefault(); comp.classList.add('drag'); }));
+['dragleave','drop'].forEach(t => comp.addEventListener(t, e => { e.preventDefault(); if (t==='drop' || !comp.contains(e.relatedTarget)) comp.classList.remove('drag'); }));
+comp.addEventListener('drop', e => readFile(e.dataTransfer.files[0]));
+document.addEventListener('paste', e => { const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/')); if (f) readFile(f); });
+
+function renderLoras(){
+  const box = $('#loraBox');
+  if (!state.loras.length){ box.innerHTML = `<div class="hint" style="margin-bottom:6px;color:var(--muted)">${t('loras.label')}</div><span class="hint">${t('loras.none')}</span>`; return; }
+  if (box.dataset.sig === state.loras.map(l=>l.id).join()) return;
+  box.dataset.sig = state.loras.map(l=>l.id).join();
+  box.innerHTML = `<div class="hint" style="margin-bottom:2px;color:var(--muted)">${t('loras.label')}</div>` + state.loras.map(l => {
+    const s = loraSel[l.id] || {on:false, w:1};
+    return `<label class="lora-row"><input type="checkbox" data-id="${esc(l.id)}" ${s.on?'checked':''}><span>${esc(l.name)}</span>
+      <input type="range" min="0" max="2" step="0.05" value="${s.w}" data-w="${esc(l.id)}"><b class="hint" style="width:32px">${(+s.w).toFixed(2)}</b></label>`;
+  }).join('');
+  box.querySelectorAll('[data-id]').forEach(c => c.onchange = () => { (loraSel[c.dataset.id] ??= {w:1}).on = c.checked; store.set('loras', loraSel); });
+  box.querySelectorAll('[data-w]').forEach(r => r.oninput = () => { (loraSel[r.dataset.w] ??= {on:false}).w = +r.value; r.nextElementSibling.textContent = (+r.value).toFixed(2); store.set('loras', loraSel); });
+}
+
+async function submit(over){
+  const body = over || {
+    prompt: $('#prompt').value.trim(), res: opts.res, sec: opts.sec, aspect: opts.aspect, steps: opts.steps,
+    seed: $('#seed').value.trim() || null, neg: $('#neg').value.trim() || null,
+    loras: state.loras.filter(l => loraSel[l.id]?.on).map(l => ({id:l.id, w:loraSel[l.id].w})),
+    ...(image?.data ? {image: image.data} : {upload: image?.upload}),
+  };
+  if (!over && (!image || !body.prompt)) return;
+  const est = over ? null : estimate();
+  if (est > 2*3600 && !confirm(t('confirm.long', fmtDur(est)))) return;
+  $('#err').textContent = ''; $('#go').disabled = true;
+  try {
+    const r = await api('/api/generate', body);
+    const j = await r.json();
+    if (!r.ok) throw new Error(tx(j.error) || t('err.server'));
+    toast(state.jobs.some(x => x.status === 'running') ? t('toast.queued') : t('toast.generating'));
+    if (!over){ $('#prompt').value = ''; store.set('draft', ''); setImage(null); $('#prompt').style.height = ''; }
+    show('create'); poll();
+  } catch (e){ $('#err').textContent = e.message; }
+  segs();
+}
+$('#go').onclick = () => submit();
+
+/* suggestion chips: the label is translated, the inserted prompt stays English (it is meant for the model) */
+const IDEAS = [
+  ['idea.smile', 'turns toward the camera and smiles warmly'],
+  ['idea.wind', 'a gentle breeze moves the hair and clothes'],
+  ['idea.pushIn', 'slow cinematic camera push-in'],
+  ['idea.orbit', 'the camera slowly orbits around the subject'],
+  ['idea.blink', 'blinks naturally and breathes calmly'],
+  ['idea.walk', 'walks forward toward the camera, natural gait'],
+  ['idea.bg', 'subtle motion in the background, leaves and light shifting'],
+];
+$('#ideas').innerHTML = IDEAS.map(([l,p]) => `<button class="idea" data-t="${esc(p)}" title="${esc(p)}">+ ${esc(t(l))}</button>`).join('');
+$('#ideas').querySelectorAll('.idea').forEach(b => b.onclick = () => {
+  const el = $('#prompt'), v = el.value.trim();
+  el.value = v ? `${v.replace(/[.,]$/, '')}, ${b.dataset.t}` : b.dataset.t.charAt(0).toUpperCase() + b.dataset.t.slice(1);
+  el.dispatchEvent(new Event('input')); el.focus();
+});
+if (app){
+  $('#openOut').onclick = () => window.studio.openOutput();
+  $('#lbSave').onclick = async () => { if (await window.studio.saveAs(current.name)) toast(t('toast.saved')); };
+  $('#lbShow').onclick = () => window.studio.showItem(current.name);
+}
+
+/* ---------- render ---------- */
+function card(v){
+  let tag = [v.res && v.res+'p', v.sec && v.sec+' '+t('dur.s')].filter(Boolean).join(' · ');
+  if (v.partial) tag = (tag ? tag + ' · ' : '') + t('card.partial');
+  return `<button class="card" data-name="${esc(v.name)}">
+    <video src="${esc(v.url)}#t=0.1" ${v.poster?`poster="${esc(v.poster)}"`:''} muted loop playsinline preload="metadata"></video>
+    ${tag?`<span class="tag">${tag}</span>`:''}
+    <div class="ov"><p>${esc(v.prompt || v.name)}</p><span>${v.created?fmtDate(v.created):''}${v.took?' · '+fmtDur(v.took):''}</span></div></button>`;
+}
+function bindCards(root){
+  root.querySelectorAll('.card').forEach(c => {
+    const v = c.querySelector('video');
+    c.onmouseenter = () => v.play().catch(()=>{}); c.onmouseleave = () => { v.pause(); };
+    c.onclick = () => openLb(state.videos.find(x => x.name === c.dataset.name));
+  });
+}
+function renderGrid(el, list, emptyHtml){
+  const sig = list.map(v => v.name + (v.prompt ? '+' : '') + (v.partial ? 'p' : '')).join('|');
+  if (el.dataset.sig === sig) return;
+  el.dataset.sig = sig;
+  el.innerHTML = list.length ? list.map(card).join('') : `<div class="empty">${emptyHtml}</div>`;
+  el.style.columns = list.length ? '' : 'auto';
+  bindCards(el);
+}
+function renderLib(){
+  const q = $('#q').value.trim().toLowerCase();
+  const list = state.videos.filter(v => !q || (v.prompt||'').toLowerCase().includes(q));
+  renderGrid($('#lib'), list, q ? t('empty.none') : t('empty.lib'));
+  $('#libSub').textContent = plural(state.videos.length, 'n.video');
+}
+$('#q').oninput = renderLib;
+
+function jobMeta(j){
+  const now = Date.now()/1000;
+  if (j.status === 'error') return `<span>${esc(tx(j.error) || t('job.error'))}</span>`;
+  if (j.status === 'cancelled') return `<span>${t('job.cancelled')}</span>`;
+  if (j.status === 'queued') return `<span>${t('job.queued')}</span><span>${j.res}p · ${j.sec} ${t('dur.s')}</span>${j.eta?`<span>${j.wait?t('job.startsIn', fmtDur(j.wait)):''}${t('job.takes', fmtDur(j.eta))}</span>`:''}`;
+  const el = now - j.started, left = j.left;
+  return `<span>${esc(tx(j.phase))}</span><span>${pct(j.progress)}</span><span>${fmtDur(el)}${left?t('job.left', fmtDur(left)):''}</span>`;
+}
+function renderJobs(){
+  const js = state.jobs;
+  $('#jobsWrap').hidden = !js.length;
+  const sig = js.map(j => j.id + j.status + !!j.video).join('|');
+  if ($('#jobs').dataset.sig === sig) {          // only update the numbers so buttons don't lose focus
+    for (const j of js) {
+      const el = $('#jobs').querySelector(`[data-job="${j.id}"]`); if (!el) continue;
+      const bar = el.querySelector('.bar i'); if (bar) bar.style.width = (j.progress*100).toFixed(1) + '%';
+      const m = el.querySelector('.m'), h = jobMeta(j); if (m.innerHTML !== h) m.innerHTML = h;
+    }
+  } else {
+  $('#jobs').dataset.sig = sig;
+  $('#jobs').innerHTML = js.map(j => `<div class="job ${j.status}" data-job="${j.id}">
+      <div class="pv">${j.poster?`<img src="${esc(j.poster)}" alt="">`:''}</div>
+      <div class="b"><div class="p">${esc(j.prompt)}</div><div class="m">${jobMeta(j)}</div>
+        ${['running','queued'].includes(j.status)?`<div class="bar"><i style="width:${(j.progress*100).toFixed(1)}%"></i></div>`:''}</div>
+      ${['running','queued'].includes(j.status)
+        ? `<button class="ib" data-cancel="${j.id}" title="${t('job.cancel')}"><svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.7"><path d="M1 1l10 10M11 1 1 11"/></svg></button>`
+        : `<div class="acts2">${app && j.status==='error' ? `<button class="ib" data-log="${esc(j.log)}" title="${t('job.log')}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg></button>` : ''}${j.video ? `<button class="ib" data-play="${esc(j.video)}" title="${t('job.playPartial')}"><svg width="13" height="13" viewBox="0 0 12 12"><path d="M3 1.5v9l7.5-4.5z" fill="currentColor"/></svg></button>` : ''}<button class="ib" data-dismiss="${j.id}" title="${t('job.dismiss')}"><svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.7"><path d="M1 1l10 10M11 1 1 11"/></svg></button></div>`}
+    </div>`).join('');
+  $('#jobs').querySelectorAll('[data-log]').forEach(b => b.onclick = () => window.studio.openLog(b.dataset.log));
+  $('#jobs').querySelectorAll('[data-play]').forEach(b => b.onclick = () => openLb(state.videos.find(v => v.url === b.dataset.play) || {name: b.dataset.play.split('/').pop(), url: b.dataset.play, prompt: t('job.partialPrompt')}));
+  $('#jobs').querySelectorAll('[data-cancel]').forEach(b => b.onclick = async () => {
+    if (!confirm(t('confirm.cancel'))) return;
+    await api('/api/cancel', {id:b.dataset.cancel}); poll(); });
+  $('#jobs').querySelectorAll('[data-dismiss]').forEach(b => b.onclick = async () => {
+    await api('/api/dismiss', {id:b.dataset.dismiss}); poll(); });
+  }
+
+  const active = js.filter(j => ['running','queued'].includes(j.status));
+  $('#qTitle').hidden = !active.length;
+  $('#miniQ').innerHTML = active.map(j => `<div class="it">${j.poster?`<img src="${esc(j.poster)}" alt="">`:''}
+      <div class="t"><b>${esc(j.prompt)}</b>${j.status==='running'?`<div class="bar"><i style="width:${(j.progress*100).toFixed(1)}%"></i></div>`:t('job.waiting')}</div></div>`).join('');
+  const run = js.find(j => j.status === 'running');
+  $('#gpuDot').classList.toggle('busy', !!run);
+  $('#gpuTxt').textContent = run ? t('gpu.busy', pct(run.progress)) : t('gpu.free');
+  document.title = run ? `${pct(run.progress)} · Videogen Studio` : 'Videogen Studio';
+}
+
+/* ---------- lightbox ---------- */
+function openLb(v){
+  if (!v) return;
+  current = v;
+  $('#lbVid').src = v.url; $('#lbVid').poster = v.poster || '';
+  $('#lbPrompt').textContent = v.prompt || t('lb.noPrompt');
+  const kv = [[t('lb.res'), v.width ? `${v.width}×${v.height} (${v.res}p)` : (v.res ? v.res+'p' : '')], [t('lb.len'), v.sec && v.sec+' '+t('dur.s')],
+    ...(v.partial ? [[t('lb.status'), t('lb.incomplete', tx(v.error) || t('lb.failed'))]] : []), [t('lb.aspect'), v.aspect === 'auto' ? t('lb.matchImage') : v.aspect], [t('lb.steps'), v.steps], [t('lb.seed'), v.seed],
+    [t('lb.loras'), (v.loras||[]).join(', ')], [t('lb.took'), v.took && fmtDur(v.took)], [t('lb.created'), v.created && fmtDate(v.created)], [t('lb.file'), v.name]];
+  $('#lbKv').innerHTML = kv.filter(([,x]) => x != null && x !== '').map(([k,x]) => `<dt>${k}</dt><dd>${esc(x)}</dd>`).join('');
+  $('#lbDl').href = v.url; $('#lbDl').download = v.name;
+  const can = !!(v.upload && v.prompt);
+  $('#lbAgain').hidden = $('#lbEdit').hidden = !can;
+  const wasOpen = $('#lb').classList.contains('open');
+  $('#lb').classList.add('open'); document.documentElement.classList.add('lb-open');
+  if (!wasOpen) $('#lbClose').focus();
+  $('#lbHint').textContent = state.videos.length > 1 && state.videos.some(x => x.name === v.name) ? t('lb.hintNav') : t('lb.hint');
+}
+function closeLb(){ $('#lb').classList.remove('open'); document.documentElement.classList.remove('lb-open'); $('#lbVid').pause(); $('#lbVid').removeAttribute('src'); $('#lbVid').load(); current = null; }
+$('#lbClose').onclick = closeLb;
+$('#lb').onclick = e => { if (e.target.id === 'lb' || e.target.classList.contains('stage')) closeLb(); };
+document.addEventListener('keydown', e => {
+  if (!current) return;
+  if (e.key === 'Escape') return closeLb();
+  if (e.target.closest('input,textarea,select')) return;
+  const vid = $('#lbVid');
+  if (e.key === ' ') { e.preventDefault(); vid.paused ? vid.play() : vid.pause(); }
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    const i = state.videos.findIndex(x => x.name === current.name);
+    const n = state.videos[i + (e.key === 'ArrowRight' ? 1 : -1)];
+    if (i >= 0 && n) { e.preventDefault(); openLb(n); }
+  }
+  if (e.key === 'Tab') {   // keep focus trapped inside the lightbox
+    const f = [...$('#lb').querySelectorAll('button:not([hidden]),a[href],video')].filter(x => x.offsetParent);
+    if (!f.length) return;
+    const k = f.indexOf(document.activeElement);
+    if (e.shiftKey && k <= 0) { e.preventDefault(); f.at(-1).focus(); }
+    else if (!e.shiftKey && k === f.length - 1) { e.preventDefault(); f[0].focus(); }
+  }
+});
+$('#lbAgain').onclick = () => { const v = current; closeLb();
+  submit({prompt:v.prompt, res:v.res, sec:v.sec, aspect:v.aspect||'auto', steps:v.steps||4, upload:v.upload, seed:null,
+          neg:v.neg||null, loras:v.lora_ids||[]}); };
+$('#lbEdit').onclick = () => { const v = current; closeLb();
+  $('#prompt').value = v.prompt; store.set('draft', v.prompt);
+  Object.assign(opts, {res:v.res||480, sec:v.sec||5, aspect:v.aspect||'auto', steps:v.steps||4}); saveOpts();
+  setImage({upload: v.upload, url: '/uploads/' + encodeURIComponent(v.upload)});
+  $('#neg').value = v.neg || ''; $('#seed').value = '';
+  for (const id in loraSel) loraSel[id].on = false;
+  for (const l of v.lora_ids || []) loraSel[l.id] = {on:true, w:l.w};
+  store.set('loras', loraSel); $('#loraBox').dataset.sig = ''; renderLoras();
+  if (v.neg || (v.lora_ids||[]).length || (v.steps||4) !== 4) { $('#adv').classList.add('open'); $('#advBtn').classList.add('on'); }
+  show('create'); $('#prompt').focus(); };
+$('#lbDel').onclick = async () => {
+  if (!confirm(t('confirm.delete'))) return;
+  const r = await api('/api/delete', {name: current.name});
+  if (!r.ok){ toast(tx((await r.json()).error) || t('toast.cantDelete')); return; }
+  closeLb(); toast(t('toast.deleted')); poll();
+};
+
+function toast(msg){ const el = $('#toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2200); }
+
+/* ---------- polling ---------- */
+let doneSeen = new Set(), first = true;
+async function poll(){
+  try {
+    const r = await fetch('/api/state'); state = await r.json();
+  } catch { $('#gpuTxt').textContent = t('status.offline'); $('#gpuDot').classList.add('busy'); return; }
+  $('#mock').hidden = !state.mock;
+  for (const v of state.videos){ if (!first && !doneSeen.has(v.name) && !v.partial) toast(t('toast.done')); doneSeen.add(v.name); }
+  first = false;
+  $('#libCount').textContent = state.videos.length || '';
+  renderJobs(); renderLoras(); renderLib();
+  renderGrid($('#recent'), state.videos.slice(0, 9), t('empty.recent'));
+  $('#allLink').hidden = state.videos.length <= 9;
+  segs();
+}
+show(store.get('view', 'create'));
+segs(); poll();
+setInterval(poll, 2000);
+</script>
+</body>
+</html>

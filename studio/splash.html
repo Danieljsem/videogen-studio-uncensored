@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self'">
+<title>Videogen Studio</title>
+<style>
+  html,body{margin:0;height:100%;background:#121110;color:#ece7e0;font:14px/1.5 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .drag{position:fixed;inset:0 0 auto 0;height:40px;-webkit-app-region:drag}
+  .c{height:100%;display:grid;place-items:center;text-align:center}
+  img{width:72px;height:72px;margin-bottom:18px;animation:in .6s ease-out both}
+  h1{font:600 22px "Segoe UI Variable Display","Segoe UI",sans-serif;margin:0 0 6px;animation:in .6s .08s ease-out both}
+  #s{color:#9a938a;min-height:21px;animation:in .6s .16s ease-out both}
+  .bar{width:180px;height:3px;border-radius:0;background:#2c2925;margin:22px auto 0;overflow:hidden}
+  .bar i{display:block;width:40%;height:100%;background:#e8a35c;border-radius:0;animation:slide 1.3s ease-in-out infinite}
+  .err #s{color:#e5684f;max-width:440px}
+  .err .bar{display:none}
+  .btns{display:none;gap:10px;justify-content:center;margin-top:20px}
+  .err .btns{display:flex}
+  button{font:inherit;color:#ece7e0;background:#211f1c;border:1px solid #3a3631;border-radius:0;padding:8px 16px;cursor:pointer}
+  button:hover{background:#2a2723}
+  button.pri{background:#e8a35c;color:#1b1309;border-color:transparent;font-weight:500}
+  @keyframes slide{from{transform:translateX(-110%)}to{transform:translateX(260%)}}
+  @keyframes in{from{opacity:0;transform:translateY(6px)}}
+</style>
+</head>
+<body>
+<div class="drag"></div>
+<div class="c"><div>
+  <img src="icon.png" alt="">
+  <h1>Videogen Studio</h1>
+  <div id="s">Starting…</div>
+  <div class="bar"><i></i></div>
+  <div class="btns"><button class="pri" id="retry">Try again</button><button id="log">Open log</button></div>
+</div></div>
+<script>
+  // status text comes from Electron already localized; only the static strings are translated here
+  const T = {
+    en: {start: 'Starting…', retry: 'Try again', log: 'Open log'},
+    cs: {start: 'Spouštím…', retry: 'Zkusit znovu', log: 'Otevřít log'},
+    de: {start: 'Starte…', retry: 'Erneut versuchen', log: 'Log öffnen'},
+    uk: {start: 'Запуск…', retry: 'Спробувати знову', log: 'Відкрити журнал'},
+    es: {start: 'Iniciando…', retry: 'Reintentar', log: 'Abrir registro'},
+  };
+  // language from Electron (?lang=…), otherwise the system language
+  const want = new URLSearchParams(location.search).get('lang') || (navigator.language || '').slice(0, 2).toLowerCase();
+  const lang = T[want] ? want : 'en';
+  const L = T[lang];
+  document.documentElement.lang = lang;
+  const s = document.getElementById('s');
+  s.textContent = L.start;
+  document.getElementById('retry').textContent = L.retry;
+  document.getElementById('log').textContent = L.log;
+  window.studio.onStatus(({text, error}) => { s.textContent = text; document.body.classList.toggle('err', !!error); });
+  document.getElementById('retry').onclick = () => { document.body.classList.remove('err'); s.textContent = L.start; window.studio.retry(); };
+  document.getElementById('log').onclick = () => window.studio.serverLog();
+</script>
+</body>
+</html>

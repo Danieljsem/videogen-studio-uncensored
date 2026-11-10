@@ -1,0 +1,29 @@
+# models, environments, tools (large / machine-specific)
+models/
+venv/
+.venv/
+tools/
+__pycache__/
+*.pyc
+
+# user data – never commit
+*.safetensors
+*.mp4
+output/
+uploads/
+test/
+
+# Electron
+studio/node_modules/
+studio/server.log
+
+# local notes / logs
+CLAUDE.md
+*.log
+
+# editors / OS / secrets
+.env
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
