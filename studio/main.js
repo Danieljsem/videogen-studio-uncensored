@@ -1,6 +1,7 @@
-// Videogen Studio – Electron shell around server.py (Wan 2.2 I2V).
-// Starts the Python server with the ROCm environment, shows a splash screen, then loads the UI.
-// Extras: progress in the Windows taskbar, notifications when done, native save/folder dialogs.
+// Videogen Studio – Electron shell around server.py (Wan 2.2 image -> video, Chroma text -> image).
+// Starts the Python server with the GPU settings from local.env (written by the installer), shows a splash
+// screen, then loads the UI. Windows and Linux.
+// Extras: progress in the taskbar, notifications when done, native save/folder dialogs.
 const { app, BrowserWindow, ipcMain, dialog, shell, Notification, nativeImage } = require('electron');
 const { spawn, execFile } = require('child_process');
 const path = require('path');
@@ -10,9 +11,10 @@ const ROOT = path.resolve(__dirname, '..');            // project root
 const OUT = path.join(ROOT, process.env.WAN_MOCK === '1' ? 'test/mock_output' : 'output');
 const PORT = Number(process.env.WAN_PORT || 7870);   // 7860 is usually taken (Gradio/A1111/Forge)
 const URL = `http://127.0.0.1:${PORT}`;
-const PY = path.join(ROOT, 'venv', 'Scripts', 'python.exe');
+const WIN = process.platform === 'win32';
+const PY = WIN ? path.join(ROOT, 'venv', 'Scripts', 'python.exe') : path.join(ROOT, 'venv', 'bin', 'python');
 const ICON = path.join(__dirname, 'icon.png');          // notifications
-const WIN_ICON = path.join(__dirname, 'icon.ico');     // window + taskbar
+const WIN_ICON = path.join(__dirname, WIN ? 'icon.ico' : 'icon.png');   // window + taskbar
 const SERVER_LOG = path.join(__dirname, 'server.log');
 
 let win = null, server = null, ownServer = false, quitting = false, monitor = null, lastState = null;
@@ -48,19 +50,30 @@ async function probe(ms = 1500) {
 }
 async function ping(ms) { const st = await probe(ms); return st && !st.foreign ? st : null; }
 
+// GPU-specific variables from the installer (KEY=VALUE lines); values already set in the environment win
+function localEnv() {
+  const out = {};
+  try {
+    for (const line of fs.readFileSync(path.join(ROOT, 'local.env'), 'utf8').split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+      if (m && !line.trim().startsWith('#')) out[m[1]] = m[2].replace(/^"(.*)"$/, '$1');
+    }
+  } catch {}
+  return out;
+}
+
 function startServer() {
   const env = {
-    // ROCm defaults for AMD gfx1151 – values already set in the environment win
-    HIP_PATH: 'C:\\Program Files\\AMD\\ROCm\\7.1\\',
-    PYTORCH_ROCM_ARCH: 'gfx1151', HSA_OVERRIDE_GFX_VERSION: '11.5.1',
-    MIOPEN_FIND_MODE: '2', MIOPEN_LOG_LEVEL: '3',
+    MIOPEN_FIND_MODE: '2', MIOPEN_LOG_LEVEL: '3',   // harmless on NVIDIA; quieter, faster MIOpen on AMD
+    ...localEnv(),
     ...process.env,
     PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8',
     WAN_PORT: String(PORT),
   };
-  env.PATH = `${env.HIP_PATH}bin;${process.env.PATH}`;
+  if (WIN && env.HIP_PATH) env.PATH = `${path.join(env.HIP_PATH, 'bin')};${process.env.PATH}`;
   const log = fs.createWriteStream(SERVER_LOG, { flags: 'w' });
-  server = spawn(PY, ['-u', path.join(ROOT, 'server.py')], { cwd: ROOT, env, windowsHide: true });
+  // own process group on Linux, so closing the app also stops generate.py / downloads
+  server = spawn(PY, ['-u', path.join(ROOT, 'server.py')], { cwd: ROOT, env, windowsHide: true, detached: !WIN });
   server.stdout.pipe(log); server.stderr.pipe(log);
   server.on('exit', code => {
     server = null;
@@ -91,8 +104,9 @@ async function shutdownForeign() {
 
 function killServer() {
   if (!server || !ownServer) return;
-  // /T = including the generate.py child process
-  try { execFile('taskkill', ['/F', '/T', '/PID', String(server.pid)], { windowsHide: true }); } catch {}
+  // including the generate.py / download child processes
+  if (WIN) { try { execFile('taskkill', ['/F', '/T', '/PID', String(server.pid)], { windowsHide: true }); } catch {} }
+  else { try { process.kill(-server.pid, 'SIGTERM'); } catch { try { server.kill('SIGTERM'); } catch {} } }
   server = null;
 }
 
@@ -103,7 +117,11 @@ async function boot() {
   const first = await probe();
   if (first && first.foreign) return status(portMsg(), true);
   if (!first) {
-    if (!fs.existsSync(PY)) return status(L(`Python not found: ${PY}`, `Nenalezen Python: ${PY}`, `Python nicht gefunden: ${PY}`, `Python не знайдено: ${PY}`, `No se encontró Python: ${PY}`), true);
+    if (!fs.existsSync(PY)) return status(L(`Python not found: ${PY} – run the installer first (install.bat / install.sh).`,
+      `Nenalezen Python: ${PY} – nejdřív spusť instalátor (install.bat / install.sh).`,
+      `Python nicht gefunden: ${PY} – starte zuerst den Installer (install.bat / install.sh).`,
+      `Python не знайдено: ${PY} – спочатку запустіть інсталятор (install.bat / install.sh).`,
+      `No se encontró Python: ${PY}: ejecuta primero el instalador (install.bat / install.sh).`), true);
     startServer();
     for (let i = 0; i < 120; i++) {               // max ~60 s
       if (!server) return;                        // crashed – the error is already on screen
@@ -138,7 +156,9 @@ function startMonitor() {
     // finished jobs leave the queue -> look for new videos
     for (const v of st.videos) {
       if (!seen.has('v:' + v.name)) {
-        if (seen.has('init') && !v.partial) notify(L('Video is ready', 'Video je hotové', 'Video ist fertig', 'Відео готове', 'El vídeo está listo'), v.prompt || v.name, v.poster);
+        if (seen.has('init') && !v.partial) notify(v.kind === 'image'
+          ? L('Image is ready', 'Obrázek je hotový', 'Bild ist fertig', 'Зображення готове', 'La imagen está lista')
+          : L('Video is ready', 'Video je hotové', 'Video ist fertig', 'Відео готове', 'El vídeo está listo'), v.prompt || v.name, v.poster);
         seen.set('v:' + v.name, 1);
       }
     }
@@ -178,7 +198,9 @@ function createWindow() {
     if (quitting) return;
     e.preventDefault();
     const st = (await ping(4000)) || lastState;   // if the server is busy, use the last known state
-    const active = st ? st.jobs.filter(j => ['running', 'queued'].includes(j.status)).length : 0;
+    const act = st ? st.jobs.filter(j => ['running', 'queued'].includes(j.status)) : [];
+    const downloading = !!(st && st.download && st.download.status === 'running');
+    const active = act.length + (downloading ? 1 : 0);
     let stopForeign = false;
     await syncLang();
     if (active) {
@@ -186,21 +208,34 @@ function createWindow() {
       const cancel = L('Cancel', 'Zrušit', 'Abbrechen', 'Скасувати', 'Cancelar');
       const keep = L('Keep running in background', 'Nechat běžet na pozadí', 'Im Hintergrund weiterlaufen lassen', 'Залишити працювати у фоні', 'Seguir en segundo plano');
       const buttons = ownServer ? [stop, cancel] : [stop, keep, cancel];
+      const img = act.length === 1 && act[0].kind === 'image';
+      const message = !act.length
+        ? L('A model is being downloaded.', 'Právě se stahuje model.', 'Gerade wird ein Modell heruntergeladen.', 'Зараз завантажується модель.', 'Se está descargando un modelo.')
+        : act.length === 1
+          ? (img ? L('An image is being generated.', 'Právě se generuje obrázek.', 'Gerade wird ein Bild generiert.', 'Зараз генерується зображення.', 'Se está generando una imagen.')
+                 : L('A video is being generated.', 'Právě se generuje video.', 'Gerade wird ein Video generiert.', 'Зараз генерується відео.', 'Se está generando un vídeo.'))
+          : L(`${act.length} jobs are in the queue.`, `Ve frontě ${act.length <= 4 ? 'jsou' : 'je'} ${act.length} ${act.length <= 4 ? 'úlohy' : 'úloh'}.`,
+              `${act.length} Aufträge sind in der Warteschlange.`, `Завдань у черзі: ${act.length}.`, `Hay ${act.length} tareas en cola.`);
+      const dlNote = downloading && act.length ? L(' The model download stops too.', ' Zastaví se i stahování modelu.', ' Auch der Modell-Download wird gestoppt.', ' Завантаження моделі теж зупиниться.', ' También se detendrá la descarga del modelo.') : '';
       const { response } = await dialog.showMessageBox(win, {
         type: 'warning', title: 'Videogen Studio', noLink: true, defaultId: buttons.length - 1, cancelId: buttons.length - 1,
-        message: active === 1 ? L('A video is being generated.', 'Právě se generuje video.', 'Gerade wird ein Video generiert.', 'Зараз генерується відео.', 'Se está generando un vídeo.')
-          : L(`${active} videos are in the queue.`, `Ve frontě ${active <= 4 ? 'jsou' : 'je'} ${active} ${active <= 4 ? 'videa' : 'videí'}.`,
-              `${active} Videos sind in der Warteschlange.`, `Відео в черзі: ${active}.`, `Hay ${active} vídeos en cola.`),
-        detail: ownServer ? L('Closing the app stops generation and the video in progress will be lost.',
-                              'Zavřením aplikace se generování zastaví a rozpracované video se ztratí.',
-                              'Beim Schließen wird die Generierung gestoppt und das laufende Video geht verloren.',
-                              'Закриття застосунку зупинить генерацію, і відео, що створюється, буде втрачене.',
-                              'Al cerrar la app se detiene la generación y se perderá el vídeo en curso.')
-          : L('Generation runs in the background (started by an earlier instance). Stop it, or let it finish – the video will appear in the library.',
-              'Generování běží na pozadí (spustila ho dřívější instance). Můžeš ho zastavit, nebo nechat doběhnout – hotové video se objeví v knihovně.',
-              'Die Generierung läuft im Hintergrund (von einer früheren Instanz gestartet). Stoppe sie oder lass sie fertig laufen – das Video erscheint in der Bibliothek.',
-              'Генерація працює у фоні (її запустив попередній екземпляр). Зупиніть її або дайте завершитися – відео з’явиться в бібліотеці.',
-              'La generación sigue en segundo plano (la inició una instancia anterior). Detenla o deja que termine: el vídeo aparecerá en la biblioteca.'),
+        message,
+        detail: (!act.length
+          ? L('Closing the app stops the download. It resumes where it stopped next time.',
+              'Zavřením aplikace se stahování zastaví. Příště naváže tam, kde skončilo.',
+              'Beim Schließen wird der Download gestoppt. Beim nächsten Mal geht es dort weiter.',
+              'Закриття застосунку зупинить завантаження. Наступного разу воно продовжиться з того ж місця.',
+              'Al cerrar la app se detiene la descarga. La próxima vez continúa donde se quedó.')
+          : ownServer ? L('Closing the app stops generation; work in progress will be lost (finished images are kept).',
+                              'Zavřením aplikace se generování zastaví a rozpracovaná práce se ztratí (hotové obrázky zůstanou).',
+                              'Beim Schließen wird die Generierung gestoppt und die laufende Arbeit geht verloren (fertige Bilder bleiben).',
+                              'Закриття застосунку зупинить генерацію, і незавершена робота буде втрачена (готові зображення залишаться).',
+                              'Al cerrar la app se detiene la generación y se pierde el trabajo en curso (las imágenes terminadas se conservan).')
+          : L('Generation runs in the background (started by an earlier instance). Stop it, or let it finish – the result will appear in the library.',
+              'Generování běží na pozadí (spustila ho dřívější instance). Můžeš ho zastavit, nebo nechat doběhnout – výsledek se objeví v knihovně.',
+              'Die Generierung läuft im Hintergrund (von einer früheren Instanz gestartet). Stoppe sie oder lass sie fertig laufen – das Ergebnis erscheint in der Bibliothek.',
+              'Генерація працює у фоні (її запустив попередній екземпляр). Зупиніть її або дайте завершитися – результат з’явиться в бібліотеці.',
+              'La generación sigue en segundo plano (la inició una instancia anterior). Detenla o deja que termine: el resultado aparecerá en la biblioteca.')) + dlNote,
         buttons,
       });
       if (response === buttons.length - 1) return;
@@ -225,9 +260,12 @@ ipcMain.handle('open-log', (_, name) => {
 });
 ipcMain.handle('save-as', async (_, name) => {
   const src = outFile(name);
+  const png = src.toLowerCase().endsWith('.png');
   const { canceled, filePath } = await dialog.showSaveDialog(win, {
-    title: L('Save video', 'Uložit video', 'Video speichern', 'Зберегти відео', 'Guardar vídeo'), defaultPath: path.join(app.getPath('videos'), path.basename(src)),
-    filters: [{ name: 'MP4 video', extensions: ['mp4'] }],
+    title: png ? L('Save image', 'Uložit obrázek', 'Bild speichern', 'Зберегти зображення', 'Guardar imagen')
+               : L('Save video', 'Uložit video', 'Video speichern', 'Зберегти відео', 'Guardar vídeo'),
+    defaultPath: path.join(app.getPath(png ? 'pictures' : 'videos'), path.basename(src)),
+    filters: [png ? { name: 'PNG image', extensions: ['png'] } : { name: 'MP4 video', extensions: ['mp4'] }],
   });
   if (canceled || !filePath) return false;
   await fs.promises.copyFile(src, filePath);

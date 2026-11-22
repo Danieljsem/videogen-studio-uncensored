@@ -1,10 +1,11 @@
-"""Videogen Studio – local web app on top of generate.py.
+"""Videogen Studio – local web app on top of generate.py (image -> video) and generate_image.py (text -> image).
 
-Start: studio.bat (Electron) or `python server.py` and open http://127.0.0.1:7870.
+Start: studio.bat / studio.sh (Electron) or `python server.py` and open http://127.0.0.1:7870.
 Standard library + Pillow only.
-Queue: only one video renders at a time (single GPU), the rest wait. Every video in output/ has
-<name>.json (settings, timing) and <name>.jpg (poster = cropped input image) next to it.
-WAN_MOCK=1 -> runs mock_generate.py instead of generate.py (UI testing without a GPU).
+Queue: only one job runs at a time (single GPU), the rest wait. Every video in output/ has
+<name>.json (settings, timing) and <name>.jpg (poster = cropped input image) next to it; every image has <name>.json.
+Model downloads (download_models.py) run next to the queue, one at a time.
+WAN_MOCK=1 -> runs the mock_*.py fakes instead (UI testing without a GPU or downloads).
 User-facing messages are returned as {"en": ..., "cs": ..., "de": ..., "uk": ..., "es": ...}; the UI picks one.
 """
 import base64
@@ -12,6 +13,7 @@ import io
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -23,6 +25,9 @@ from urllib.parse import unquote, urlparse
 
 from PIL import Image, ImageOps
 
+import catalog
+
+catalog.load_local_env()   # GPU settings from the installer, inherited by the generators
 ROOT = Path(__file__).resolve().parent
 MOCK = os.environ.get("WAN_MOCK") == "1"
 OUT = ROOT / ("test/mock_output" if MOCK else "output")   # keep mock runs out of the real library
@@ -38,6 +43,7 @@ MIME = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=ut
         ".mp4": "video/mp4", ".jpg": "image/jpeg", ".png": "image/png", ".svg": "image/svg+xml", ".json": "application/json"}
 
 jobs = []          # dicts, newest last
+download = {}      # the current / last model download: pack, status, done, total, error, proc
 _meta_cache = {}   # json path -> (mtime, meta)
 lock = threading.Lock()
 wake = threading.Event()
@@ -106,6 +112,27 @@ MESSAGES = {
                  "Der Seed muss eine ganze Zahl 0 – 4294967295 sein (oder leer = zufällig).",
                  "Seed має бути цілим числом 0 – 4294967295 (або порожнім = випадковий).",
                  "La semilla debe ser un número entero 0 – 4294967295 (o vacía = aleatoria)."),
+    "ph_imgmodel": ("Loading image model", "Načítám model obrázků", "Lade Bildmodell", "Завантажую модель зображень",
+                    "Cargando modelo de imagen"),
+    "ph_image": ("Generating image {i}/{n}", "Generuji obrázek {i}/{n}", "Generiere Bild {i}/{n}", "Генерую зображення {i}/{n}",
+                 "Generando imagen {i}/{n}"),
+    "ph_image1": ("Generating image", "Generuji obrázek", "Generiere Bild", "Генерую зображення", "Generando imagen"),
+    "no_prompt_img": ("Describe the image.", "Popiš obrázek.", "Beschreibe das Bild.", "Опишіть зображення.", "Describe la imagen."),
+    "no_image_model": ("The image model is not downloaded yet.", "Model pro obrázky ještě není stažený.",
+                       "Das Bildmodell ist noch nicht heruntergeladen.", "Модель зображень ще не завантажено.",
+                       "El modelo de imagen aún no está descargado."),
+    "no_video_model": ("The video model is not downloaded yet.", "Model pro video ještě není stažený.",
+                       "Das Videomodell ist noch nicht heruntergeladen.", "Відеомодель ще не завантажено.",
+                       "El modelo de vídeo aún no está descargado."),
+    "dl_busy": ("Another download is running.", "Už běží jiné stahování.", "Es läuft bereits ein anderer Download.",
+                "Вже триває інше завантаження.", "Ya hay otra descarga en curso."),
+    "dl_failed": ("Download failed: {err}", "Stahování selhalo: {err}", "Download fehlgeschlagen: {err}",
+                  "Завантаження не вдалося: {err}", "La descarga falló: {err}"),
+    "dl_space": ("Not enough disk space: {err}", "Málo místa na disku: {err}", "Nicht genug Speicherplatz: {err}",
+                 "Недостатньо місця на диску: {err}", "No hay suficiente espacio en disco: {err}"),
+    "partial_batch": ("Stopped after {k} of {n} images: {err}", "Zastaveno po {k} z {n} obrázků: {err}",
+                      "Nach {k} von {n} Bildern gestoppt: {err}", "Зупинено після {k} з {n} зображень: {err}",
+                      "Detenido tras {k} de {n} imágenes: {err}"),
     "lora_gone": ("LoRA is no longer in models/loras: {name}", "LoRa už ve složce models/loras není: {name}",
                   "LoRA ist nicht mehr in models/loras: {name}", "LoRA більше немає в models/loras: {name}",
                   "La LoRA ya no está en models/loras: {name}"),
@@ -156,28 +183,68 @@ def lora_pairs():
     return pairs
 
 
+def read_meta(js):
+    try:
+        mt = js.stat().st_mtime
+        if _meta_cache.get(js, (None,))[0] != mt:
+            _meta_cache[js] = (mt, json.loads(js.read_text(encoding="utf-8")))
+        return _meta_cache[js][1]
+    except Exception:
+        return {}
+
+
 def video_list():
+    """Library: finished videos and images, newest first. Items have kind "video" or "image"."""
     vids = []
     with lock:
-        busy = {Path(j["out"]).name for j in jobs if j["status"] in ("queued", "running")}
-    for mp4 in sorted(OUT.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True):
-        if mp4.name.endswith(".part.mp4") or mp4.name in busy:   # unfinished videos stay out of the library
-            continue
-        meta = {}
-        js = mp4.with_suffix(".json")
+        busy = {Path(j["out"]).name for j in jobs if j["status"] in ("queued", "running") and j["kind"] == "video"}
+        busy_img = {Path(j["out"]).stem for j in jobs if j["status"] in ("queued", "running") and j["kind"] == "image"}
+    files = []
+    for f in (OUT.iterdir() if OUT.exists() else []):
+        if f.suffix not in (".mp4", ".png") or f.name.endswith((".part.mp4", ".part.png")) or f.name in busy:
+            continue   # unfinished files stay out of the library
         try:
-            mt = js.stat().st_mtime
-            if _meta_cache.get(js, (None,))[0] != mt:
-                _meta_cache[js] = (mt, json.loads(js.read_text(encoding="utf-8")))
-            meta = _meta_cache[js][1]
-        except Exception:
+            files.append((f.stat().st_mtime, f))
+        except OSError:   # renamed / deleted by a generator between listing and stat
             pass
-        vids.append({"name": mp4.name, "url": f"/output/{mp4.name}",
-                     "poster": f"/output/{mp4.stem}.jpg" if mp4.with_suffix(".jpg").exists() else None, "neg": meta.get("neg"),
+    for _, f in sorted(files, key=lambda x: x[0], reverse=True):
+        meta = read_meta(f.with_suffix(".json"))
+        if f.suffix == ".png":
+            if not meta and any(f.stem == b or f.stem.startswith(b + "_") for b in busy_img):
+                continue   # image of a batch that is still running – appears with its settings when the batch ends
+            vids.append({"kind": "image", "name": f.name, "url": f"/output/{f.name}", "poster": f"/output/{f.name}",
+                         "created": meta.get("finished") or f.stat().st_mtime, **{k: meta.get(k) for k in (
+                             "prompt", "neg", "aspect", "mp", "seed", "steps", "cfg", "model", "model_name", "took",
+                             "width", "height", "count")}})
+            continue
+        vids.append({"kind": "video", "name": f.name, "url": f"/output/{f.name}",
+                     "poster": f"/output/{f.stem}.jpg" if f.with_suffix(".jpg").exists() else None, "neg": meta.get("neg"),
                      "lora_ids": meta.get("lora_ids") or [],
-                     "created": meta.get("finished") or mp4.stat().st_mtime, **{k: meta.get(k) for k in (
+                     "created": meta.get("finished") or f.stat().st_mtime, **{k: meta.get(k) for k in (
                          "prompt", "res", "sec", "aspect", "seed", "steps", "loras", "took", "width", "height", "upload", "partial", "error")}})
     return vids
+
+
+def pack_installed(name):
+    if MOCK:   # mock downloads mark packs in test/mock_packs.json; the video pack counts as installed
+        try:
+            st = json.loads((ROOT / "test" / "mock_packs.json").read_text())
+        except Exception:
+            st = {}
+        return st.get(name, name == "video")
+    return catalog.installed(name)
+
+
+def packs_state():
+    return {k: {"name": p["name"], "size_gb": p["size_gb"], "vram_gb": p["vram_gb"], "license": p["license"],
+                "installed": pack_installed(k)} for k, p in catalog.PACKS.items()}
+
+
+def image_models():
+    if MOCK:
+        out = [{"id": "chroma", "name": "Chroma1-HD", "kind": "chroma"}] if pack_installed("image") else []
+        return out + ([{"id": "mock_sdxl.safetensors", "name": "mock sdxl", "kind": "sdxl"}] if pack_installed("sdxl") else [])
+    return catalog.image_models()
 
 
 # Time estimate (default constants, calibrated at runtime from finished videos): tokens N = (w/16)·(h/16)·(1 + (frames−1)/4).
@@ -222,6 +289,32 @@ def time_left(j, k):
     return max(0, round(estimate(j["width"], j["height"], j["sec"], steps, k) - (time.time() - j["started"])))
 
 
+# Image estimate: load IMG_LOAD s, then IMG_STEP s per step at 1 MP (SDXL ~3x faster than Chroma); calibrated like videos.
+IMG_LOAD, IMG_STEP = 60, 1.6
+
+
+def img_raw(w, h, steps, count, model):
+    mp = (w * h) / 2**20
+    return IMG_LOAD + count * steps * IMG_STEP * mp ** 1.2 * (1 if model == "chroma" else 0.33)
+
+
+def img_calib(items):
+    """Correction from finished images (took covers the whole batch, so compare per batch)."""
+    ks = sorted(v["took"] / img_raw(v["width"], v["height"], v.get("steps") or 30, v.get("count") or 1, v.get("model") or "chroma")
+                for v in items if v.get("kind") == "image" and v.get("took") and v.get("width") and v.get("height"))
+    return min(4.0, max(0.25, ks[len(ks) // 2])) if ks else 1.0
+
+
+def img_left(j, k):
+    if j["status"] != "running" or not j.get("started"):
+        return None
+    if j.get("s_it") and j.get("img"):
+        steps = j.get("n_steps") or j["steps"]
+        return round((steps - (j.get("k") or 0)) * j["s_it"] + (j["count"] - j["img"]) * steps * j["s_it"])
+    return max(0, round(img_raw(j["width"], j["height"], j["steps"], j["count"], j["model_kind"]) * k
+                        - (time.time() - j["started"])))
+
+
 def out_size(img, res):
     """Actual video size – same math as fit() in generate.py."""
     area, ar = (480 * 832 if res == 480 else 720 * 1280), img.height / img.width
@@ -245,9 +338,9 @@ def friendly_error(lines, code, log_name):
 
 
 def public(j):
-    return {k: j[k] for k in ("id", "status", "prompt", "res", "sec", "aspect", "steps", "seed", "progress",
-                              "phase", "created", "started", "finished", "error", "video", "poster", "eta",
-                              "width", "height")} | {"log": Path(j["out"]).with_suffix(".log").name}
+    return {k: j.get(k) for k in ("id", "kind", "status", "prompt", "res", "sec", "aspect", "steps", "seed", "progress",
+                                  "phase", "created", "started", "finished", "error", "video", "poster", "eta",
+                                  "width", "height", "count", "model_name")} | {"log": Path(j["out"]).with_suffix(".log").name}
 
 
 def part_of(out):
@@ -264,15 +357,51 @@ def track_speed(j, line, k):
             j["s_it"] = v if m[2] == "s/it" else 1 / v
 
 
-def run_job(j):
-    args = [sys.executable, "-u", str(ROOT / ("mock_generate.py" if MOCK else "generate.py")), j["image"], j["prompt"],
-            "--res", str(j["res"]), "--sec", str(j["sec"]), "--steps", str(j["steps"]), "--out", j["out"]]
+def image_args(j):
+    args = [sys.executable, "-u", str(ROOT / ("mock_generate_image.py" if MOCK else "generate_image.py")), j["prompt"],
+            "--aspect", j["aspect"], "--mp", str(j["mp"]), "--count", str(j["count"]), "--steps", str(j["steps"]),
+            "--cfg", str(j["cfg"]), "--model", j["model"], "--out", j["out"]]
     if j["seed"] is not None:
         args += ["--seed", str(j["seed"])]
     if j.get("neg"):
         args += ["--neg", j["neg"]]
-    for l in j["loras"]:
-        args += ["--lora", str(LORAS / l["high"]), str(LORAS / l["low"]), str(l["w"])]
+    return args
+
+
+def parse_image_line(j, line):
+    if "text encoder" in line:
+        j["phase"], j["progress"] = msg("ph_prompt"), 0.03
+    elif "image model" in line or "model (CPU offload)" in line:
+        j["phase"], j["progress"] = msg("ph_imgmodel"), max(j["progress"], 0.08)
+    elif m := re.search(r"image (\d+)/(\d+):", line):
+        j["img"], j["k"] = int(m[1]), 0
+        j["phase"] = msg("ph_image", i=m[1], n=m[2]) if int(m[2]) > 1 else msg("ph_image1")
+        j["progress"] = max(j["progress"], 0.15 + 0.85 * (int(m[1]) - 1) / j["count"])
+    elif m := re.search(r"SAVED (\S+) seed (\d+)", line):
+        j.setdefault("saved", []).append((m[1], int(m[2])))
+        j["progress"] = max(j["progress"], 0.15 + 0.85 * len(j["saved"]) / j["count"])
+
+
+def image_tqdm(j, text):
+    if j.get("img") and (m := re.search(r"(\d+)/(\d+) \[", text)):
+        k, n = int(m[1]), int(m[2])
+        j["n_steps"] = n
+        j["progress"] = max(j["progress"], 0.15 + 0.85 * (j["img"] - 1 + 0.97 * k / n) / j["count"])
+        track_speed(j, text, k)
+
+
+def run_job(j):
+    if j["kind"] == "image":
+        args = image_args(j)
+    else:
+        args = [sys.executable, "-u", str(ROOT / ("mock_generate.py" if MOCK else "generate.py")), j["image"], j["prompt"],
+                "--res", str(j["res"]), "--sec", str(j["sec"]), "--steps", str(j["steps"]), "--out", j["out"]]
+        if j["seed"] is not None:
+            args += ["--seed", str(j["seed"])]
+        if j.get("neg"):
+            args += ["--neg", j["neg"]]
+        for l in j["loras"]:
+            args += ["--lora", str(LORAS / l["high"]), str(LORAS / l["low"]), str(l["w"])]
     env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8", WAN_PARENT_PID=str(os.getpid()))
     log_path = Path(j["out"]).with_suffix(".log")
     p = subprocess.Popen(args, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -281,7 +410,8 @@ def run_job(j):
         j["proc"] = p
         if j["status"] == "cancelled":  # cancelled right before the process started
             kill(p)
-    n_seg, seg, buf = max(1, -(-j["sec"] // 5)), 0, b""
+    img = j["kind"] == "image"
+    n_seg, seg, buf = (1 if img else max(1, -(-j["sec"] // 5))), 0, b""
     with open(log_path, "wb") as lf:
         while True:
             ch = p.stdout.read1(4096) if hasattr(p.stdout, "read1") else p.stdout.read(1)
@@ -293,7 +423,9 @@ def run_job(j):
             parts = re.split(rb"[\r\n]", buf)
             buf = parts.pop()
             # tqdm rewrites its line with \r – read the unfinished line (e.g. "1/4 [40:16<…") right away, not with the next step
-            if seg and (m := re.search(rb"(\d+)/(\d+) \[", buf)):
+            if img:
+                image_tqdm(j, buf.decode("utf-8", "replace"))
+            elif seg and (m := re.search(rb"(\d+)/(\d+) \[", buf)):
                 k, n = int(m[1]), int(m[2])
                 j["progress"] = max(j["progress"], 0.12 + 0.86 * (seg - 1 + 0.9 * k / n) / n_seg)
                 track_speed(j, buf.decode("utf-8", "replace"), k)
@@ -301,7 +433,10 @@ def run_job(j):
                 line = raw.decode("utf-8", "replace").strip()
                 if not line:
                     continue
-                if "text encoder" in line:
+                if img:
+                    parse_image_line(j, line)
+                    image_tqdm(j, line)
+                elif "text encoder" in line:
                     j["phase"], j["progress"] = msg("ph_prompt"), 0.02
                 elif "expert high" in line:
                     j["phase"], j["progress"] = msg("ph_model1"), 0.05
@@ -368,7 +503,41 @@ def rm(*paths):
                 time.sleep(1)
 
 
+def finish_image(j, code):
+    """Images are saved one by one, so whatever finished is kept – even after a cancel or a crash."""
+    out = Path(j["out"])
+    j["finished"] = time.time()
+    saved = [(n, sd) for n, sd in j.get("saved") or [] if (OUT / n).exists()]
+    if j["status"] != "cancelled":
+        if code == 0 and saved:
+            j["status"], j["progress"] = "done", 1.0
+        else:
+            j["status"] = "error"
+            err = friendly_error(j.get("errlines") or [], code, out.with_suffix(".log").name)
+            j["error"] = msg("partial_batch", k=len(saved), n=j["count"], err=tuple(tx_all(err))) if saved else err
+    for f in OUT.glob(f"{out.stem}*.part.png"):
+        rm(f)
+    took = round(j["finished"] - j["started"]) if j.get("started") else None
+    for name, sd in saved:
+        meta = {k: j[k] for k in ("prompt", "neg", "aspect", "mp", "steps", "cfg", "model", "model_name", "width", "height")}
+        meta.update(seed=sd, finished=j["finished"], count=len(saved),
+                    took=took if j["status"] == "done" else None)
+        (OUT / name).with_suffix(".json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
+    if saved:
+        j["video"] = f"/output/{saved[0][0]}"
+        j["poster"] = j["video"]
+    if j["status"] in ("done", "cancelled"):
+        rm(out.with_suffix(".log"))   # the log only matters when something went wrong
+
+
+def tx_all(m):
+    """A msg() dict (or plain string) as a per-language tuple, to nest one message in another."""
+    return [m.get(lang, m.get("en", "")) if isinstance(m, dict) else m for lang in LANGS]
+
+
 def finish(j, code):
+        if j["kind"] == "image":
+            return finish_image(j, code)
         out, part = Path(j["out"]), part_of(j["out"])
         j["finished"] = time.time()
         if j["status"] == "cancelled":
@@ -404,6 +573,67 @@ def finish(j, code):
             m = re.search(r"seed (\d+)", out.with_suffix(".log").read_text("utf-8", "replace"))
             meta["seed"] = int(m[1]) if m else None
         out.with_suffix(".json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+# ---------- model downloads ----------
+def start_download(pack):
+    """Each run gets its own dict; a finished or cancelled run never touches the state of a newer one."""
+    global download
+    with lock:
+        if download.get("status") == "running" or download.get("proc"):   # running, or a cancelled one still exiting
+            return False
+        dl = {"pack": pack, "status": "running", "done": 0, "total": 0, "error": None, "started": time.time()}
+        download = dl
+    threading.Thread(target=run_download, args=(dl,), daemon=True).start()
+    return True
+
+
+def run_download(dl):
+    args = [sys.executable, "-u", str(ROOT / ("mock_download.py" if MOCK else "download_models.py")), dl["pack"], "--machine"]
+    env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8", WAN_PARENT_PID=str(os.getpid()))
+    last_err, code = "", -1
+    try:
+        p = subprocess.Popen(args, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                             encoding="utf-8", errors="replace", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        with lock:
+            dl["proc"] = p
+            stop = dl["status"] == "cancelled"   # cancelled before the process existed
+        if stop:
+            kill(p)
+        for line in p.stdout:
+            line = line.strip()
+            if m := re.match(r"PROGRESS (\d+) (\d+)", line):
+                dl["done"], dl["total"] = int(m[1]), int(m[2])
+            elif line.startswith("ERROR "):
+                last_err = line[6:]
+            elif re.match(r"^[\w.]+(Error|Exception)\b", line):
+                last_err = line
+        code = p.wait()
+    except Exception as e:  # noqa
+        last_err = repr(e)
+    with lock:
+        dl.pop("proc", None)
+        if dl["status"] == "cancelled":
+            return
+        if code == 0:
+            dl["status"] = "done"
+        else:
+            dl["status"] = "error"
+            key = "dl_space" if code == 2 else "dl_failed"
+            dl["error"] = msg(key, err=(last_err or f"code {code}")[:240])
+        dl["finished"] = time.time()
+
+
+def dismiss_download():
+    global download
+    with lock:
+        if download.get("status") != "running" and not download.get("proc"):
+            download = {}
+
+
+def download_public():
+    with lock:
+        return {k: v for k, v in download.items() if k != "proc"} or None
 
 
 # ---------- HTTP ----------
@@ -471,23 +701,31 @@ class H(BaseHTTPRequestHandler):
         if u.startswith("/uploads/"):
             return self.safe(UPL, u[9:])
         if u == "/api/state":
-            with lock:
-                js = [public(j) for j in jobs if j["status"] in ("queued", "running")
-                      or (j["status"] in ("error", "cancelled") and time.time() - (j["finished"] or 0) < 3600)]
-                left = {j["id"]: time_left(j, 1.0) for j in jobs if j["status"] == "running"}
             vids = video_list()
-            k = calib(vids)
+            k, ki = calib(vids), img_calib(vids)
+            with lock:
+                active = [j for j in jobs if j["status"] in ("queued", "running")
+                          or (j["status"] in ("error", "cancelled") and time.time() - (j["finished"] or 0) < 3600)]
+                js = [public(j) for j in active]
+                left = {j["id"]: (img_left(j, ki) if j["kind"] == "image" else time_left(j, 1.0))
+                        for j in active if j["status"] == "running"}
+                raw = {j["id"]: j for j in active}
             wait = 0
             for j in js:
                 if j["status"] == "running":
                     j["left"] = left.get(j["id"])
                     wait += j["left"] or 0
                 elif j["status"] == "queued":
-                    j["eta"] = estimate(j["width"], j["height"], j["sec"], j["steps"], k)
+                    r = raw[j["id"]]
+                    j["eta"] = (round(img_raw(r["width"], r["height"], r["steps"], r["count"], r["model_kind"]) * ki)
+                                if r["kind"] == "image" else estimate(j["width"], j["height"], j["sec"], j["steps"], k))
                     j["wait"], wait = wait, wait + j["eta"]
             return self.send(200, {"app": "videogen-studio", "jobs": js, "videos": vids, "loras": lora_pairs(),
                                    "mock": MOCK, "model": {"load": LOAD_S, "a": MODEL_A, "b": MODEL_B,
-                                                           "dec": MODEL_DEC, "seg": SEG_S, "k": k}})
+                                                           "dec": MODEL_DEC, "seg": SEG_S, "k": k},
+                                   "img_model": {"load": IMG_LOAD, "step": IMG_STEP, "k": ki},
+                                   "packs": packs_state(), "image_models": image_models(),
+                                   "download": download_public()})
         self.send(404, {"error": msg("not_found")})
 
     def safe(self, base, rel):
@@ -507,7 +745,36 @@ class H(BaseHTTPRequestHandler):
         except Exception:
             return self.send(400, {"error": msg("bad_request")})
         if u == "/api/generate":
-            return self.generate(d)
+            return self.generate_image(d) if d.get("kind") == "image" else self.generate(d)
+        if u == "/api/install":
+            pack = str(d.get("pack", ""))
+            if pack not in catalog.PACKS:
+                return self.send(400, {"error": msg("bad_request")})
+            if not start_download(pack):
+                return self.send(409, {"error": msg("dl_busy")})
+            return self.send(200, {"ok": True})
+        if u == "/api/install_cancel":
+            with lock:
+                p = download.get("proc")
+                if download.get("status") == "running":
+                    download["status"], download["finished"] = "cancelled", time.time()
+                else:
+                    p = None
+            if p:
+                kill(p)   # the partial file stays; the next download resumes it
+            return self.send(200, {"ok": True})
+        if u == "/api/install_dismiss":
+            dismiss_download()
+            return self.send(200, {"ok": True})
+        if u == "/api/use_image":   # "Animate": a generated image becomes the input of a video
+            name = Path(str(d.get("name", ""))).name
+            src = OUT / name
+            if not name.endswith(".png") or not src.is_file():
+                return self.send(400, {"error": msg("bad_file")})
+            up = UPL / f"anim_{name}"   # one copy per image, however often it is animated
+            if not up.exists():
+                shutil.copyfile(src, up)
+            return self.send(200, {"upload": up.name, "url": f"/uploads/{up.name}"})
         if u == "/api/cancel":
             with lock:
                 j = next((x for x in jobs if x["id"] == d.get("id")), None)
@@ -515,7 +782,7 @@ class H(BaseHTTPRequestHandler):
                     return self.send(404, {"error": msg("not_running")})
                 was, j["status"], j["finished"] = j["status"], "cancelled", time.time()
                 p = j.get("proc") if was == "running" else None
-                if was == "queued":  # never started – clean up now
+                if was == "queued" and j["kind"] == "video":  # never started – clean up now
                     rm(Path(j["out"]).with_suffix(".jpg"), j["image"])
             if p:
                 kill(p)  # outside the lock so /api/state does not block
@@ -530,7 +797,9 @@ class H(BaseHTTPRequestHandler):
             return self.send(200, {"ok": True})
         if u == "/api/shutdown":   # closing the app when an earlier instance started the server
             with lock:
-                procs = [x.get("proc") for x in jobs if x["status"] in ("queued", "running")]
+                procs = [x.get("proc") for x in jobs if x["status"] in ("queued", "running")] + [download.get("proc")]
+                if download.get("status") == "running":
+                    download["status"] = "cancelled"
                 for x in jobs:
                     if x["status"] in ("queued", "running"):
                         x["status"] = "cancelled"
@@ -542,6 +811,14 @@ class H(BaseHTTPRequestHandler):
             return
         if u == "/api/delete":
             name = Path(str(d.get("name", ""))).name
+            if name.endswith(".png"):
+                with lock:
+                    if any(x["kind"] == "image" and x["status"] in ("queued", "running") and
+                           (Path(name).stem == Path(x["out"]).stem or Path(name).stem.startswith(Path(x["out"]).stem + "_"))
+                           for x in jobs):
+                        return self.send(409, {"error": msg("rendering")})
+                rm(OUT / name, (OUT / name).with_suffix(".json"))
+                return self.send(200, {"ok": True})
             if not name.endswith(".mp4"):
                 return self.send(400, {"error": msg("bad_file")})
             with lock:
@@ -573,6 +850,8 @@ class H(BaseHTTPRequestHandler):
             return self.send(400, {"error": msg("bad_settings")})
         if res not in (480, 720) or sec not in (5, 10, 15) or not 1 <= steps <= 50:
             return self.send(400, {"error": msg("bad_settings")})
+        if not pack_installed("video"):
+            return self.send(400, {"error": msg("no_video_model")})
         aspect = d.get("aspect", "auto")
         if aspect != "auto" and aspect not in ASPECTS:
             return self.send(400, {"error": msg("bad_aspect")})
@@ -612,12 +891,51 @@ class H(BaseHTTPRequestHandler):
         thumb = img.copy()
         thumb.thumbnail((720, 720))
         thumb.save(OUT / f"{stem}.jpg", quality=88)
-        j = {"id": jid, "status": "queued", "prompt": prompt, "neg": (d.get("neg") or "").strip() or None,
+        j = {"id": jid, "kind": "video", "status": "queued", "prompt": prompt, "neg": (d.get("neg") or "").strip() or None,
              "res": res, "sec": sec, "aspect": aspect, "steps": steps, "seed": seed, "loras": loras,
              "image": str(src), "upload": up.name, "out": str(OUT / f"{stem}.mp4"),
              "width": w, "height": h, "progress": 0.0, "phase": msg("ph_queued"), "created": time.time(), "started": None,
              "finished": None, "error": None, "video": None, "poster": f"/output/{stem}.jpg",
              "eta": estimate(w, h, sec, steps, calib(video_list()))}
+        with lock:
+            jobs.append(j)
+        wake.set()
+        self.send(200, public(j))
+
+
+    def generate_image(self, d):
+        prompt = str(d.get("prompt", "")).strip()
+        if not prompt:
+            return self.send(400, {"error": msg("no_prompt_img")})
+        models = {m["id"]: m for m in image_models()}
+        model = str(d.get("model") or "chroma")
+        if model not in models:
+            return self.send(400, {"error": msg("no_image_model")})
+        chroma = models[model]["kind"] == "chroma"
+        try:
+            count = int(d.get("count", 1))
+            steps = int(d.get("steps") or (30 if chroma else 28))
+            cfg = float(d["cfg"]) if d.get("cfg") not in (None, "") else (3.0 if chroma else 5.0)
+            mp = float(d.get("mp", 1.0))
+        except (TypeError, ValueError):
+            return self.send(400, {"error": msg("bad_settings")})
+        aspect = str(d.get("aspect") or "1:1")
+        if count not in (1, 2, 4) or not 1 <= steps <= 100 or not 0 <= cfg <= 20 or mp not in (1.0, 1.5) \
+                or aspect not in catalog.IMAGE_ASPECTS:
+            return self.send(400, {"error": msg("bad_settings")})
+        seed = str(d.get("seed") if d.get("seed") is not None else "").strip()
+        if seed and not (seed.isdigit() and int(seed) < 2**32):
+            return self.send(400, {"error": msg("bad_seed")})
+        seed = int(seed) if seed else int.from_bytes(os.urandom(4), "little") % (2**32 - 8)
+        jid = uuid.uuid4().hex[:8]
+        w, h = catalog.size_for(aspect, mp)
+        j = {"id": jid, "kind": "image", "status": "queued", "prompt": prompt, "neg": (d.get("neg") or "").strip() or None,
+             "aspect": aspect, "mp": mp, "count": count, "steps": steps, "cfg": cfg, "seed": seed, "model": model,
+             "model_kind": models[model]["kind"], "model_name": models[model]["name"],
+             "out": str(OUT / f"img_{time.strftime('%Y%m%d_%H%M%S')}_{jid}.png"), "width": w, "height": h,
+             "progress": 0.0, "phase": msg("ph_queued"), "created": time.time(), "started": None, "finished": None,
+             "error": None, "video": None, "poster": None,
+             "eta": round(img_raw(w, h, steps, count, models[model]["kind"]) * img_calib(video_list()))}
         with lock:
             jobs.append(j)
         wake.set()

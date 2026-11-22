@@ -27,3 +27,7 @@ CLAUDE.md
 .idea/
 Thumbs.db
 .DS_Store
+desktop.ini
+
+# GPU settings written by the installer
+local.env

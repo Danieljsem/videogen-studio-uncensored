@@ -16,6 +16,7 @@
   --display:"Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}   /* classes with display:flex must not override the hidden attribute */
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--text);font:14px/1.45 var(--font);-webkit-font-smoothing:antialiased;overflow:hidden}
 button,input,textarea,select{font:inherit;color:inherit}
@@ -124,6 +125,7 @@ textarea::placeholder{color:var(--faint)}
 .job .bar i{display:block;height:100%;background:var(--accent);border-radius:0;transition:width .6s}
 .job.error{border-color:rgba(229,104,79,.4)}
 .job.error .m{color:var(--danger)}
+.job.error .m span{white-space:normal}
 .ib{width:30px;height:30px;border-radius:0;display:grid;place-items:center;color:var(--muted);flex:none}
 .ib:hover{background:var(--panel2);color:var(--text)}
 
@@ -183,12 +185,37 @@ textarea::placeholder{color:var(--faint)}
 .lang button.on{color:var(--accent)}
 .kbd{font-size:11px;color:var(--faint);border:1px solid var(--line);border-radius:0;padding:0 5px;margin-left:6px}
 
+/* video / image mode */
+.mode-image .vid-only{display:none!important}
+.mode-video .img-only{display:none!important}
+.adv.img-only{grid-template-columns:110px 110px 150px minmax(0,1fr)}
+.adv select{background:var(--bg);border:1px solid var(--line);border-radius:0;padding:8px 10px;outline:0;font-size:13px}
+.adv select option{background:var(--panel)}
+.mode-image textarea#prompt{min-height:72px}
+.card img.still{aspect-ratio:auto}
+.card .kind{position:absolute;top:8px;right:8px;padding:3px;background:rgba(0,0,0,.55);color:#eee;backdrop-filter:blur(6px)}
+.lb img#lbImg{max-width:100%;max-height:calc(100vh - 56px);background:#000;display:block}
+.filter{display:flex;gap:10px;align-items:center}
+/* model install card */
+.install{max-width:760px;margin:0 auto;background:var(--panel);border:1px solid var(--line);padding:22px 22px 20px}
+.install h3{font:600 16px var(--display);margin:0 0 6px}
+.install p{margin:0 0 4px;color:var(--muted)}
+.install .meta{font-size:12.5px;color:var(--faint);margin:10px 0 16px;font-variant-numeric:tabular-nums}
+.install .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.install .bar{flex:1;min-width:200px;height:6px;background:var(--line);overflow:hidden}
+.install .bar i{display:block;height:100%;background:var(--accent);transition:width .8s}
+.install .num{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.install .note{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px;color:var(--faint)}
+.install .note button{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.install .bad{color:var(--danger);font-size:13px;margin-top:10px}
+.btn.sm{padding:8px 14px;display:inline-flex}
+
 @media (max-width:860px){
   .app{grid-template-columns:1fr}
   .side{display:none}
   .wrap{padding:0 16px 60px}
   .lb.open{grid-template-columns:1fr;overflow-y:auto}
-  .adv{grid-template-columns:1fr}
+  .adv,.adv.img-only{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -197,7 +224,8 @@ textarea::placeholder{color:var(--faint)}
 <div class="app">
   <aside class="side">
     <div class="brand"><img class="mark" src="/static/favicon.png" alt="">Videogen Studio</div>
-    <button class="nav on" data-view="create"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="nav.create">Create</span></button>
+    <button class="nav on" data-view="create" data-mode="video"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="0"/><path d="m16 10 5-3v10l-5-3z"/></svg><span data-i18n="nav.video">Create video</span></button>
+    <button class="nav" data-view="create" data-mode="image"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="0"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></svg><span data-i18n="nav.image">Create image</span></button>
     <button class="nav" data-view="lib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7.5" height="7.5" rx="0"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="0"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="0"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="0"/></svg><span data-i18n="nav.lib">Library</span><span class="count" id="libCount"></span></button>
     <button class="nav app-only" id="openOut"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span data-i18n="nav.folder">Video folder</span></button>
     <div class="side-sec" id="qTitle" hidden data-i18n="side.queue">Queue</div>
@@ -208,15 +236,16 @@ textarea::placeholder{color:var(--faint)}
 
   <main id="main">
     <!-- CREATE -->
-    <div class="wrap view-create" id="viewCreate">
+    <div class="wrap view-create mode-video" id="viewCreate">
       <div class="hero">
-        <h1 data-i18n="hero.title">What should the image do?</h1>
-        <p data-i18n="hero.sub">Add a photo, describe the motion – Wan 2.2 turns it into a video. Runs locally on your GPU.</p>
+        <h1 id="heroTitle">What should the image do?</h1>
+        <p id="heroSub">Add a photo, describe the motion – Wan 2.2 turns it into a video. Runs locally on your GPU.</p>
       </div>
 
+      <div class="install" id="install" hidden></div>
       <div class="composer" id="composer">
         <div class="c-top">
-          <button class="drop" id="drop" title="Add image (or drag &amp; drop / Ctrl+V)" data-i18n-title="drop.title">
+          <button class="drop vid-only" id="drop" title="Add image (or drag &amp; drop / Ctrl+V)" data-i18n-title="drop.title">
             <span id="dropTxt"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="margin:0 auto 5px"><rect x="3" y="4" width="18" height="16" rx="0"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></svg><span data-i18n="drop.label">Image</span></span>
             <span class="x" id="dropX" title="Remove" data-i18n-title="drop.remove"><svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.6"><path d="M1 1l8 8M9 1 1 9"/></svg></span>
           </button>
@@ -224,23 +253,36 @@ textarea::placeholder{color:var(--faint)}
           <textarea id="prompt" placeholder="Describe what should happen in the video… (e.g. “she turns to the camera and smiles, hair moving in the wind”)" data-i18n-ph="prompt.ph"></textarea>
         </div>
         <div class="c-bar">
-          <div class="seg" id="segRes"><button data-v="480">480p</button><button data-v="720">720p</button></div>
-          <div class="seg" id="segSec"><button data-v="5">5 s</button><button data-v="10">10 s</button><button data-v="15">15 s</button></div>
-          <label class="chip" title="Aspect ratio (the image is center-cropped)" data-i18n-title="aspect.title">
+          <div class="seg vid-only" id="segRes"><button data-v="480">480p</button><button data-v="720">720p</button></div>
+          <div class="seg vid-only" id="segSec"><button data-v="5">5 s</button><button data-v="10">10 s</button><button data-v="15">15 s</button></div>
+          <label class="chip vid-only" title="Aspect ratio (the image is center-cropped)" data-i18n-title="aspect.title">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="6" width="16" height="12" rx="0"/></svg>
             <select id="aspect"><option value="auto" data-i18n="aspect.auto">Match image</option><option>16:9</option><option>9:16</option><option>1:1</option><option>3:2</option><option>2:3</option><option>4:5</option></select>
           </label>
+          <label class="chip img-only" title="Aspect ratio" data-i18n-title="aspect.imgTitle">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="6" width="16" height="12" rx="0"/></svg>
+            <select id="aspectImg"><option>1:1</option><option>16:9</option><option>9:16</option><option>3:2</option><option>2:3</option><option>4:5</option><option>5:4</option></select>
+          </label>
+          <div class="seg img-only" id="segCount" title="Number of images" data-i18n-title="count.title"><button data-v="1">1×</button><button data-v="2">2×</button><button data-v="4">4×</button></div>
+          <div class="seg img-only" id="segMp" title="Size" data-i18n-title="size.title"><button data-v="1">1 MP</button><button data-v="1.5">1.5 MP</button></div>
           <button class="chip" id="advBtn" title="Advanced" data-i18n-title="adv.title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span data-i18n="adv.title">Advanced</span></button>
           <span class="spacer"></span>
           <span class="est" id="est"></span>
           <button class="go" id="go" title="Generate (Ctrl+Enter)" aria-label="Generate" data-i18n-title="go.title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
         </div>
-        <div class="adv" id="adv">
+        <div class="adv vid-only" id="adv">
           <label><span data-i18n="adv.steps">Steps</span><input type="number" id="steps" min="1" max="50" value="4"><span class="hint" data-i18n="adv.stepsHint">4 = fast. Above 8 disables the speed-up (2 passes per step; 50 steps ≈ 25× slower).</span></label>
           <label><span data-i18n="adv.seed">Seed</span><input type="text" id="seed" placeholder="random" data-i18n-ph="adv.seedPh" inputmode="numeric"><span class="hint" data-i18n="adv.seedHint">Same seed + prompt = same video.</span></label>
           <div id="loraBox"></div>
           <label class="full"><span data-i18n="adv.neg">Negative prompt</span><textarea class="neg" id="neg" placeholder="Empty = official Wan negative prompt" data-i18n-ph="adv.negPh"></textarea></label>
-          
+        </div>
+        <div class="adv img-only" id="advImg">
+          <label><span data-i18n="adv.steps">Steps</span><input type="number" id="imgSteps" min="1" max="100" placeholder="30"></label>
+          <label><span data-i18n="adv.cfg">Guidance (CFG)</span><input type="number" id="imgCfg" min="0" max="20" step="0.5" placeholder="3"></label>
+          <label><span data-i18n="adv.seed">Seed</span><input type="text" id="imgSeed" placeholder="random" data-i18n-ph="adv.seedPh" inputmode="numeric"></label>
+          <label><span data-i18n="adv.model">Model</span><select id="imgModel"></select><button type="button" class="hint link" id="getChroma" hidden style="text-align:left"></button></label>
+          <span class="hint full" data-i18n="adv.imgHint">30 steps = good balance, 40+ = finest detail. Higher CFG follows the prompt more closely (Chroma 3–5, SDXL 4–7). Same seed + prompt = same image.</span>
+          <label class="full"><span data-i18n="adv.neg">Negative prompt</span><textarea class="neg" id="imgNeg" placeholder="Empty = model default" data-i18n-ph="adv.imgNegPh"></textarea></label>
         </div>
       </div>
       <div class="ideas" id="ideas"></div>
@@ -251,13 +293,13 @@ textarea::placeholder{color:var(--faint)}
         <div class="jobs" id="jobs"></div>
       </div>
 
-      <div class="sec-h"><h2 data-i18n="recent.title">Recent videos</h2><a data-view="lib" id="allLink" data-i18n="recent.all">Full library →</a></div>
+      <div class="sec-h"><h2 id="recentTitle">Recent videos</h2><a data-view="lib" id="allLink" data-i18n="recent.all">Full library →</a></div>
       <div class="grid" id="recent"></div>
     </div>
 
     <!-- LIBRARY -->
     <div class="wrap view-lib" id="viewLib" hidden>
-      <div class="hero"><div><h1 data-i18n="nav.lib">Library</h1><p id="libSub"></p></div><input class="search" id="q" placeholder="Search prompts…" data-i18n-ph="lib.search"></div>
+      <div class="hero"><div><h1 data-i18n="nav.lib">Library</h1><p id="libSub"></p></div><div class="filter"><div class="seg" id="libFilter"><button data-v="all" data-i18n="lib.all">All</button><button data-v="video" data-i18n="lib.videos">Videos</button><button data-v="image" data-i18n="lib.images">Images</button></div><input class="search" id="q" placeholder="Search prompts…" data-i18n-ph="lib.search"></div></div>
       <div class="grid" id="lib"></div>
     </div>
   </main>
@@ -265,17 +307,18 @@ textarea::placeholder{color:var(--faint)}
 
 <div class="lb" id="lb">
   <button class="close" id="lbClose" title="Close (Esc)" data-i18n-title="lb.close"><svg width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.8"><path d="M1 1l12 12M13 1 1 13"/></svg></button>
-  <div class="stage"><video id="lbVid" controls loop autoplay playsinline></video></div>
+  <div class="stage"><video id="lbVid" controls loop autoplay playsinline></video><img id="lbImg" alt="" hidden></div>
   <div class="info">
     <div class="pr" id="lbPrompt"></div>
     <dl class="kv" id="lbKv"></dl>
     <div class="hint" id="lbHint"></div>
     <div class="acts">
+      <button class="btn pri" id="lbAnimate" data-i18n="lb.animate">Animate – make a video</button>
       <button class="btn pri" id="lbAgain" data-i18n="lb.again">Again with a new seed</button>
       <button class="btn" id="lbEdit" data-i18n="lb.edit">Edit prompt</button>
       <button class="btn app-only" id="lbSave" data-i18n="lb.save">Save as…</button>
       <button class="btn app-only" id="lbShow" data-i18n="lb.show">Show in folder</button>
-      <a class="btn web-only" id="lbDl" download data-i18n="lb.download">Download MP4</a>
+      <a class="btn web-only" id="lbDl" download>Download</a>
       <button class="btn del" id="lbDel" data-i18n="lb.delete">Delete</button>
     </div>
   </div>
@@ -321,7 +364,7 @@ const I18N = {
     'dur.h': 'h', 'dur.min': 'min', 'dur.s': 's',
     'job.error': 'Error', 'job.cancelled': 'Cancelled', 'job.queued': 'Queued', 'job.startsIn': 'starts in ~{0} · ',
     'job.takes': 'takes ~{0}', 'job.left': ' · ~{0} left', 'job.cancel': 'Cancel', 'job.log': 'Open log',
-    'job.playPartial': 'Play the finished part', 'job.dismiss': 'Hide', 'job.partialPrompt': '(incomplete video – generation failed)',
+    'job.showImages': 'Show the finished images', 'job.playPartial': 'Play the finished part', 'job.dismiss': 'Hide', 'job.partialPrompt': '(incomplete video – generation failed)',
     'job.waiting': 'waiting', 'confirm.cancel': 'Cancel generation?',
     'lb.close': 'Close (Esc)', 'lb.again': 'Again with a new seed', 'lb.edit': 'Edit prompt', 'lb.save': 'Save as…',
     'lb.show': 'Show in folder', 'lb.download': 'Download MP4', 'lb.delete': 'Delete', 'lb.noPrompt': '(no prompt)',
@@ -329,7 +372,59 @@ const I18N = {
     'lb.loras': 'LoRAs', 'lb.took': 'Render time', 'lb.created': 'Created', 'lb.file': 'File',
     'lb.incomplete': 'incomplete – {0}', 'lb.failed': 'generation failed', 'lb.matchImage': 'match image',
     'lb.hintNav': '← → next video · Space pause · Esc close', 'lb.hint': 'Space pause · Esc close',
+    'lb.hintNavImg': '← → next · Esc close', 'lb.hintImg': 'Esc close',
     'confirm.delete': 'Delete this video permanently?',
+    "nav.video": "Create video",
+    "nav.image": "Create image",
+    "hero.imgTitle": "What should the image show?",
+    "hero.imgSub": "Describe it – Chroma paints it locally, uncensored. Then turn it into a video with one click.",
+    "promptImg.ph": "Describe the image… (e.g. “portrait of a woman in a red coat on a rainy street at night, cinematic light”)",
+    "aspect.imgTitle": "Aspect ratio",
+    "count.title": "Number of images",
+    "size.title": "Size (1 MP = 1024×1024)",
+    "adv.cfg": "Guidance (CFG)",
+    "adv.model": "Model",
+    "adv.imgHint": "30 steps = good balance, 40+ = finest detail. Higher CFG follows the prompt more closely (Chroma 3–5, SDXL 4–7). Same seed + prompt = same image.",
+    "adv.imgNegPh": "Empty = model default",
+    "go.needPromptImg": "Describe the image",
+    "style.photo": "Photo",
+    "style.cine": "Cinematic",
+    "style.portrait": "Portrait",
+    "style.anime": "Anime",
+    "style.oil": "Oil painting",
+    "style.3d": "3D render",
+    "recent.imgTitle": "Recent images",
+    "empty.recentImg": "Your images will appear here. Describe one above.",
+    "lib.all": "All",
+    "lib.videos": "Videos",
+    "lib.images": "Images",
+    "toast.imgDone": "Image is ready",
+    "toast.installed": "{0} is installed",
+    "lb.animate": "Animate – make a video",
+    "lb.downloadPng": "Download PNG",
+    "lb.size": "Size",
+    "lb.cfg": "CFG",
+    "lb.model": "Model",
+    "confirm.deleteImg": "Delete this image permanently?",
+    "install.titleimage": "Image generation is not installed yet",
+    "install.titlevideo": "The video model is not installed yet",
+    "install.descimage": "Chroma1-HD – an 8.9B text-to-image model, uncensored, Apache 2.0. Download it once; after that everything runs offline.",
+    "install.descvideo": "Wan 2.2 I2V A14B – two 14B experts plus a text encoder. Download it once; after that everything runs offline.",
+    "install.meta": "{0} download · needs ~{1} GB of GPU memory · {2}",
+    "install.lowVram": "Less GPU memory? It still runs with CPU offload, only slower.",
+    "install.btn": "Download ({0})",
+    "install.stop": "Stop",
+    "install.resume": "Resume",
+    "install.retry": "Try again",
+    "install.of": "{0} of {1}",
+    "install.checking": "Checking files…",
+    "install.stopped": "Stopped. Resume continues where it left off.",
+    "install.otherDl": "Another download is running – wait for it to finish.",
+    "install.sdxl": "Have your own SDXL checkpoint (Pony, Illustrious, …)? Put the .safetensors file into models/checkpoints and",
+    "install.sdxlBtn": "set it up (5 MB)",
+    "install.sdxlReady": "SDXL is set up – put a .safetensors checkpoint into models/checkpoints and it shows up here.",
+    "install.alsoChroma": "Also download Chroma1-HD",
+    "n.image": {"one": "image", "other": "images"},
   },
   cs: {
     'nav.create': 'Vytvořit', 'nav.lib': 'Knihovna', 'nav.folder': 'Složka s videi', 'side.queue': 'Fronta',
@@ -360,7 +455,7 @@ const I18N = {
     'dur.h': 'h', 'dur.min': 'min', 'dur.s': 's',
     'job.error': 'Chyba', 'job.cancelled': 'Zrušeno', 'job.queued': 'Ve frontě', 'job.startsIn': 'začne za ~{0} · ',
     'job.takes': 'trvá ~{0}', 'job.left': ' · zbývá ~{0}', 'job.cancel': 'Zrušit', 'job.log': 'Otevřít log',
-    'job.playPartial': 'Přehrát hotovou část', 'job.dismiss': 'Skrýt', 'job.partialPrompt': '(neúplné video – generování selhalo)',
+    'job.showImages': 'Ukázat hotové obrázky', 'job.playPartial': 'Přehrát hotovou část', 'job.dismiss': 'Skrýt', 'job.partialPrompt': '(neúplné video – generování selhalo)',
     'job.waiting': 'čeká', 'confirm.cancel': 'Zrušit generování?',
     'lb.close': 'Zavřít (Esc)', 'lb.again': 'Znovu s novým seedem', 'lb.edit': 'Upravit zadání', 'lb.save': 'Uložit jako…',
     'lb.show': 'Ukázat ve složce', 'lb.download': 'Stáhnout MP4', 'lb.delete': 'Smazat', 'lb.noPrompt': '(bez zadání)',
@@ -368,7 +463,59 @@ const I18N = {
     'lb.loras': 'LoRy', 'lb.took': 'Generováno', 'lb.created': 'Vytvořeno', 'lb.file': 'Soubor',
     'lb.incomplete': 'neúplné – {0}', 'lb.failed': 'generování selhalo', 'lb.matchImage': 'podle obrázku',
     'lb.hintNav': '← → další video · mezerník pauza · Esc zavřít', 'lb.hint': 'Mezerník pauza · Esc zavřít',
+    'lb.hintNavImg': '← → další · Esc zavřít', 'lb.hintImg': 'Esc zavřít',
     'confirm.delete': 'Smazat video natrvalo?',
+    "nav.video": "Vytvořit video",
+    "nav.image": "Vytvořit obrázek",
+    "hero.imgTitle": "Co má být na obrázku?",
+    "hero.imgSub": "Popiš ho – Chroma ho namaluje lokálně a bez cenzury. Jedním klikem z něj pak uděláš video.",
+    "promptImg.ph": "Popiš obrázek… (nejlépe anglicky, např. „portrait of a woman in a red coat on a rainy street at night, cinematic light“)",
+    "aspect.imgTitle": "Poměr stran",
+    "count.title": "Počet obrázků",
+    "size.title": "Velikost (1 MP = 1024×1024)",
+    "adv.cfg": "Síla zadání (CFG)",
+    "adv.model": "Model",
+    "adv.imgHint": "30 kroků = dobrý poměr, 40+ = nejjemnější detaily. Vyšší CFG se drží zadání přesněji (Chroma 3–5, SDXL 4–7). Stejný seed + zadání = stejný obrázek.",
+    "adv.imgNegPh": "Prázdné = výchozí pro model",
+    "go.needPromptImg": "Popiš obrázek",
+    "style.photo": "Fotka",
+    "style.cine": "Filmové",
+    "style.portrait": "Portrét",
+    "style.anime": "Anime",
+    "style.oil": "Olejomalba",
+    "style.3d": "3D render",
+    "recent.imgTitle": "Poslední obrázky",
+    "empty.recentImg": "Tady se objeví tvoje obrázky. Nahoře popiš, co chceš vidět.",
+    "lib.all": "Vše",
+    "lib.videos": "Videa",
+    "lib.images": "Obrázky",
+    "toast.imgDone": "Obrázek je hotový",
+    "toast.installed": "{0} je nainstalovaný",
+    "lb.animate": "Rozpohybovat – udělat video",
+    "lb.downloadPng": "Stáhnout PNG",
+    "lb.size": "Velikost",
+    "lb.cfg": "CFG",
+    "lb.model": "Model",
+    "confirm.deleteImg": "Smazat obrázek natrvalo?",
+    "install.titleimage": "Generování obrázků zatím není nainstalované",
+    "install.titlevideo": "Model pro video zatím není nainstalovaný",
+    "install.descimage": "Chroma1-HD – model text → obrázek s 8,9 mld. parametrů, bez cenzury, Apache 2.0. Stáhne se jednou, pak vše běží offline.",
+    "install.descvideo": "Wan 2.2 I2V A14B – dva 14B experti a textový enkodér. Stáhne se jednou, pak vše běží offline.",
+    "install.meta": "stažení {0} · potřebuje ~{1} GB paměti grafiky · {2}",
+    "install.lowVram": "Máš méně paměti grafiky? Poběží i tak (přes RAM), jen pomaleji.",
+    "install.btn": "Stáhnout ({0})",
+    "install.stop": "Zastavit",
+    "install.resume": "Pokračovat",
+    "install.retry": "Zkusit znovu",
+    "install.of": "{0} z {1}",
+    "install.checking": "Kontroluji soubory…",
+    "install.stopped": "Zastaveno. „Pokračovat“ naváže tam, kde skončilo.",
+    "install.otherDl": "Právě běží jiné stahování – počkej, až doběhne.",
+    "install.sdxl": "Máš vlastní SDXL checkpoint (Pony, Illustrious…)? Vlož soubor .safetensors do models/checkpoints a",
+    "install.sdxlBtn": "nastav ho (5 MB)",
+    "install.sdxlReady": "SDXL je připravené – vlož checkpoint .safetensors do models/checkpoints a objeví se tady.",
+    "install.alsoChroma": "Stáhnout i Chroma1-HD",
+    "n.image": {"one": "obrázek", "few": "obrázky", "other": "obrázků"},
   },
   de: {
     'nav.create': 'Erstellen', 'nav.lib': 'Bibliothek', 'nav.folder': 'Videoordner', 'side.queue': 'Warteschlange',
@@ -399,7 +546,7 @@ const I18N = {
     'dur.h': 'h', 'dur.min': 'min', 'dur.s': 's',
     'job.error': 'Fehler', 'job.cancelled': 'Abgebrochen', 'job.queued': 'In Warteschlange', 'job.startsIn': 'startet in ~{0} · ',
     'job.takes': 'dauert ~{0}', 'job.left': ' · noch ~{0}', 'job.cancel': 'Abbrechen', 'job.log': 'Log öffnen',
-    'job.playPartial': 'Fertigen Teil abspielen', 'job.dismiss': 'Ausblenden', 'job.partialPrompt': '(unvollständiges Video – Generierung fehlgeschlagen)',
+    'job.showImages': 'Fertige Bilder anzeigen', 'job.playPartial': 'Fertigen Teil abspielen', 'job.dismiss': 'Ausblenden', 'job.partialPrompt': '(unvollständiges Video – Generierung fehlgeschlagen)',
     'job.waiting': 'wartet', 'confirm.cancel': 'Generierung abbrechen?',
     'lb.close': 'Schließen (Esc)', 'lb.again': 'Nochmal mit neuem Seed', 'lb.edit': 'Prompt bearbeiten', 'lb.save': 'Speichern unter…',
     'lb.show': 'Im Ordner anzeigen', 'lb.download': 'MP4 herunterladen', 'lb.delete': 'Löschen', 'lb.noPrompt': '(kein Prompt)',
@@ -407,7 +554,59 @@ const I18N = {
     'lb.loras': 'LoRAs', 'lb.took': 'Renderzeit', 'lb.created': 'Erstellt', 'lb.file': 'Datei',
     'lb.incomplete': 'unvollständig – {0}', 'lb.failed': 'Generierung fehlgeschlagen', 'lb.matchImage': 'wie Bild',
     'lb.hintNav': '← → nächstes Video · Leertaste Pause · Esc schließen', 'lb.hint': 'Leertaste Pause · Esc schließen',
+    'lb.hintNavImg': '← → weiter · Esc schließen', 'lb.hintImg': 'Esc schließen',
     'confirm.delete': 'Dieses Video endgültig löschen?',
+    "nav.video": "Video erstellen",
+    "nav.image": "Bild erstellen",
+    "hero.imgTitle": "Was soll das Bild zeigen?",
+    "hero.imgSub": "Beschreibe es – Chroma malt es lokal und unzensiert. Mit einem Klick wird daraus ein Video.",
+    "promptImg.ph": "Beschreibe das Bild… (am besten auf Englisch, z. B. „portrait of a woman in a red coat on a rainy street at night, cinematic light“)",
+    "aspect.imgTitle": "Seitenverhältnis",
+    "count.title": "Anzahl der Bilder",
+    "size.title": "Größe (1 MP = 1024×1024)",
+    "adv.cfg": "Prompt-Stärke (CFG)",
+    "adv.model": "Modell",
+    "adv.imgHint": "30 Schritte = gute Balance, 40+ = feinste Details. Höhere CFG folgt dem Prompt genauer (Chroma 3–5, SDXL 4–7). Gleicher Seed + Prompt = gleiches Bild.",
+    "adv.imgNegPh": "Leer = Standard des Modells",
+    "go.needPromptImg": "Beschreibe das Bild",
+    "style.photo": "Foto",
+    "style.cine": "Filmisch",
+    "style.portrait": "Porträt",
+    "style.anime": "Anime",
+    "style.oil": "Ölgemälde",
+    "style.3d": "3D-Rendering",
+    "recent.imgTitle": "Neueste Bilder",
+    "empty.recentImg": "Hier erscheinen deine Bilder. Beschreibe oben eins.",
+    "lib.all": "Alle",
+    "lib.videos": "Videos",
+    "lib.images": "Bilder",
+    "toast.imgDone": "Bild ist fertig",
+    "toast.installed": "{0} ist installiert",
+    "lb.animate": "Animieren – Video erstellen",
+    "lb.downloadPng": "PNG herunterladen",
+    "lb.size": "Größe",
+    "lb.cfg": "CFG",
+    "lb.model": "Modell",
+    "confirm.deleteImg": "Dieses Bild endgültig löschen?",
+    "install.titleimage": "Die Bildgenerierung ist noch nicht installiert",
+    "install.titlevideo": "Das Videomodell ist noch nicht installiert",
+    "install.descimage": "Chroma1-HD – ein Text-zu-Bild-Modell mit 8,9 Mrd. Parametern, unzensiert, Apache 2.0. Einmal herunterladen, danach läuft alles offline.",
+    "install.descvideo": "Wan 2.2 I2V A14B – zwei 14B-Experten plus Text-Encoder. Einmal herunterladen, danach läuft alles offline.",
+    "install.meta": "{0} Download · braucht ~{1} GB GPU-Speicher · {2}",
+    "install.lowVram": "Weniger GPU-Speicher? Es läuft trotzdem mit CPU-Offload, nur langsamer.",
+    "install.btn": "Herunterladen ({0})",
+    "install.stop": "Stoppen",
+    "install.resume": "Fortsetzen",
+    "install.retry": "Erneut versuchen",
+    "install.of": "{0} von {1}",
+    "install.checking": "Prüfe Dateien…",
+    "install.stopped": "Gestoppt. „Fortsetzen“ macht dort weiter, wo es aufgehört hat.",
+    "install.otherDl": "Ein anderer Download läuft – warte, bis er fertig ist.",
+    "install.sdxl": "Eigener SDXL-Checkpoint (Pony, Illustrious, …)? Lege die .safetensors-Datei in models/checkpoints und",
+    "install.sdxlBtn": "richte ihn ein (5 MB)",
+    "install.sdxlReady": "SDXL ist eingerichtet – lege einen .safetensors-Checkpoint in models/checkpoints, dann erscheint er hier.",
+    "install.alsoChroma": "Auch Chroma1-HD herunterladen",
+    "n.image": {"one": "Bild", "other": "Bilder"},
   },
   uk: {
     'nav.create': 'Створити', 'nav.lib': 'Бібліотека', 'nav.folder': 'Тека з відео', 'side.queue': 'Черга',
@@ -438,7 +637,7 @@ const I18N = {
     'dur.h': 'год', 'dur.min': 'хв', 'dur.s': 'с',
     'job.error': 'Помилка', 'job.cancelled': 'Скасовано', 'job.queued': 'У черзі', 'job.startsIn': 'почнеться за ~{0} · ',
     'job.takes': 'триватиме ~{0}', 'job.left': ' · залишилось ~{0}', 'job.cancel': 'Скасувати', 'job.log': 'Відкрити лог',
-    'job.playPartial': 'Відтворити готову частину', 'job.dismiss': 'Сховати', 'job.partialPrompt': '(неповне відео – генерація не вдалася)',
+    'job.showImages': 'Показати готові зображення', 'job.playPartial': 'Відтворити готову частину', 'job.dismiss': 'Сховати', 'job.partialPrompt': '(неповне відео – генерація не вдалася)',
     'job.waiting': 'очікує', 'confirm.cancel': 'Скасувати генерацію?',
     'lb.close': 'Закрити (Esc)', 'lb.again': 'Ще раз з новим seed', 'lb.edit': 'Редагувати промпт', 'lb.save': 'Зберегти як…',
     'lb.show': 'Показати в теці', 'lb.download': 'Завантажити MP4', 'lb.delete': 'Видалити', 'lb.noPrompt': '(без промпту)',
@@ -446,7 +645,59 @@ const I18N = {
     'lb.loras': 'LoRA', 'lb.took': 'Час генерації', 'lb.created': 'Створено', 'lb.file': 'Файл',
     'lb.incomplete': 'неповне – {0}', 'lb.failed': 'генерація не вдалася', 'lb.matchImage': 'за зображенням',
     'lb.hintNav': '← → наступне відео · пробіл пауза · Esc закрити', 'lb.hint': 'Пробіл пауза · Esc закрити',
+    'lb.hintNavImg': '← → далі · Esc закрити', 'lb.hintImg': 'Esc закрити',
     'confirm.delete': 'Видалити це відео назавжди?',
+    "nav.video": "Створити відео",
+    "nav.image": "Створити зображення",
+    "hero.imgTitle": "Що має бути на зображенні?",
+    "hero.imgSub": "Опишіть його – Chroma намалює його локально й без цензури. Одним кліком перетворіть його на відео.",
+    "promptImg.ph": "Опишіть зображення… (краще англійською, напр. «portrait of a woman in a red coat on a rainy street at night, cinematic light»)",
+    "aspect.imgTitle": "Співвідношення сторін",
+    "count.title": "Кількість зображень",
+    "size.title": "Розмір (1 MP = 1024×1024)",
+    "adv.cfg": "Сила промпту (CFG)",
+    "adv.model": "Модель",
+    "adv.imgHint": "30 кроків = добрий баланс, 40+ = найтонші деталі. Вищий CFG точніше дотримується промпту (Chroma 3–5, SDXL 4–7). Той самий seed + промпт = те саме зображення.",
+    "adv.imgNegPh": "Порожньо = типовий для моделі",
+    "go.needPromptImg": "Опишіть зображення",
+    "style.photo": "Фото",
+    "style.cine": "Кінематографічно",
+    "style.portrait": "Портрет",
+    "style.anime": "Аніме",
+    "style.oil": "Олійний живопис",
+    "style.3d": "3D-рендер",
+    "recent.imgTitle": "Останні зображення",
+    "empty.recentImg": "Тут з’являться ваші зображення. Опишіть одне вгорі.",
+    "lib.all": "Усі",
+    "lib.videos": "Відео",
+    "lib.images": "Зображення",
+    "toast.imgDone": "Зображення готове",
+    "toast.installed": "{0} встановлено",
+    "lb.animate": "Анімувати – створити відео",
+    "lb.downloadPng": "Завантажити PNG",
+    "lb.size": "Розмір",
+    "lb.cfg": "CFG",
+    "lb.model": "Модель",
+    "confirm.deleteImg": "Видалити це зображення назавжди?",
+    "install.titleimage": "Генерацію зображень ще не встановлено",
+    "install.titlevideo": "Відеомодель ще не встановлено",
+    "install.descimage": "Chroma1-HD – модель «текст → зображення» на 8,9 млрд параметрів, без цензури, Apache 2.0. Завантажте один раз – далі все працює офлайн.",
+    "install.descvideo": "Wan 2.2 I2V A14B – два експерти по 14B і текстовий енкодер. Завантажте один раз – далі все працює офлайн.",
+    "install.meta": "завантаження {0} · потрібно ~{1} ГБ пам’яті відеокарти · {2}",
+    "install.lowVram": "Менше пам’яті відеокарти? Працюватиме з вивантаженням у RAM, лише повільніше.",
+    "install.btn": "Завантажити ({0})",
+    "install.stop": "Зупинити",
+    "install.resume": "Продовжити",
+    "install.retry": "Спробувати ще раз",
+    "install.of": "{0} з {1}",
+    "install.checking": "Перевіряю файли…",
+    "install.stopped": "Зупинено. «Продовжити» продовжить з того ж місця.",
+    "install.otherDl": "Триває інше завантаження – дочекайтеся його завершення.",
+    "install.sdxl": "Маєте власний SDXL-чекпойнт (Pony, Illustrious…)? Покладіть файл .safetensors у models/checkpoints і",
+    "install.sdxlBtn": "налаштуйте його (5 МБ)",
+    "install.sdxlReady": "SDXL налаштовано – покладіть чекпойнт .safetensors у models/checkpoints, і він з’явиться тут.",
+    "install.alsoChroma": "Також завантажити Chroma1-HD",
+    "n.image": {"one": "зображення", "few": "зображення", "many": "зображень", "other": "зображення"},
   },
   es: {
     'nav.create': 'Crear', 'nav.lib': 'Biblioteca', 'nav.folder': 'Carpeta de vídeos', 'side.queue': 'Cola',
@@ -477,7 +728,7 @@ const I18N = {
     'dur.h': 'h', 'dur.min': 'min', 'dur.s': 's',
     'job.error': 'Error', 'job.cancelled': 'Cancelado', 'job.queued': 'En cola', 'job.startsIn': 'empieza en ~{0} · ',
     'job.takes': 'tarda ~{0}', 'job.left': ' · quedan ~{0}', 'job.cancel': 'Cancelar', 'job.log': 'Abrir registro',
-    'job.playPartial': 'Reproducir la parte terminada', 'job.dismiss': 'Ocultar', 'job.partialPrompt': '(vídeo incompleto – la generación falló)',
+    'job.showImages': 'Ver las imágenes terminadas', 'job.playPartial': 'Reproducir la parte terminada', 'job.dismiss': 'Ocultar', 'job.partialPrompt': '(vídeo incompleto – la generación falló)',
     'job.waiting': 'en espera', 'confirm.cancel': '¿Cancelar la generación?',
     'lb.close': 'Cerrar (Esc)', 'lb.again': 'Otra vez con nueva semilla', 'lb.edit': 'Editar prompt', 'lb.save': 'Guardar como…',
     'lb.show': 'Mostrar en la carpeta', 'lb.download': 'Descargar MP4', 'lb.delete': 'Eliminar', 'lb.noPrompt': '(sin prompt)',
@@ -485,7 +736,59 @@ const I18N = {
     'lb.loras': 'LoRAs', 'lb.took': 'Tiempo de render', 'lb.created': 'Creado', 'lb.file': 'Archivo',
     'lb.incomplete': 'incompleto – {0}', 'lb.failed': 'la generación falló', 'lb.matchImage': 'como la imagen',
     'lb.hintNav': '← → siguiente vídeo · Espacio pausa · Esc cerrar', 'lb.hint': 'Espacio pausa · Esc cerrar',
+    'lb.hintNavImg': '← → siguiente · Esc cerrar', 'lb.hintImg': 'Esc cerrar',
     'confirm.delete': '¿Eliminar este vídeo definitivamente?',
+    "nav.video": "Crear vídeo",
+    "nav.image": "Crear imagen",
+    "hero.imgTitle": "¿Qué debe mostrar la imagen?",
+    "hero.imgSub": "Descríbela: Chroma la pinta en local y sin censura. Luego conviértela en vídeo con un clic.",
+    "promptImg.ph": "Describe la imagen… (mejor en inglés, p. ej. «portrait of a woman in a red coat on a rainy street at night, cinematic light»)",
+    "aspect.imgTitle": "Relación de aspecto",
+    "count.title": "Número de imágenes",
+    "size.title": "Tamaño (1 MP = 1024×1024)",
+    "adv.cfg": "Guía (CFG)",
+    "adv.model": "Modelo",
+    "adv.imgHint": "30 pasos = buen equilibrio, 40+ = máximo detalle. Un CFG más alto sigue el prompt con más precisión (Chroma 3–5, SDXL 4–7). Misma semilla + prompt = misma imagen.",
+    "adv.imgNegPh": "Vacío = predeterminado del modelo",
+    "go.needPromptImg": "Describe la imagen",
+    "style.photo": "Foto",
+    "style.cine": "Cinematográfico",
+    "style.portrait": "Retrato",
+    "style.anime": "Anime",
+    "style.oil": "Pintura al óleo",
+    "style.3d": "Render 3D",
+    "recent.imgTitle": "Imágenes recientes",
+    "empty.recentImg": "Aquí aparecerán tus imágenes. Describe una arriba.",
+    "lib.all": "Todo",
+    "lib.videos": "Vídeos",
+    "lib.images": "Imágenes",
+    "toast.imgDone": "La imagen está lista",
+    "toast.installed": "{0} está instalado",
+    "lb.animate": "Animar: crear vídeo",
+    "lb.downloadPng": "Descargar PNG",
+    "lb.size": "Tamaño",
+    "lb.cfg": "CFG",
+    "lb.model": "Modelo",
+    "confirm.deleteImg": "¿Eliminar esta imagen definitivamente?",
+    "install.titleimage": "La generación de imágenes aún no está instalada",
+    "install.titlevideo": "El modelo de vídeo aún no está instalado",
+    "install.descimage": "Chroma1-HD: modelo de texto a imagen de 8900 millones de parámetros, sin censura, Apache 2.0. Se descarga una vez y luego todo funciona sin conexión.",
+    "install.descvideo": "Wan 2.2 I2V A14B: dos expertos de 14B más un codificador de texto. Se descarga una vez y luego todo funciona sin conexión.",
+    "install.meta": "descarga de {0} · necesita ~{1} GB de memoria de GPU · {2}",
+    "install.lowVram": "¿Menos memoria de GPU? Funciona igualmente con descarga a la CPU, solo más lento.",
+    "install.btn": "Descargar ({0})",
+    "install.stop": "Detener",
+    "install.resume": "Reanudar",
+    "install.retry": "Reintentar",
+    "install.of": "{0} de {1}",
+    "install.checking": "Comprobando archivos…",
+    "install.stopped": "Detenido. «Reanudar» continúa donde se quedó.",
+    "install.otherDl": "Hay otra descarga en curso: espera a que termine.",
+    "install.sdxl": "¿Tienes tu propio checkpoint SDXL (Pony, Illustrious…)? Pon el archivo .safetensors en models/checkpoints y",
+    "install.sdxlBtn": "configúralo (5 MB)",
+    "install.sdxlReady": "SDXL está configurado: pon un checkpoint .safetensors en models/checkpoints y aparecerá aquí.",
+    "install.alsoChroma": "Descargar también Chroma1-HD",
+    "n.image": {"one": "imagen", "other": "imágenes"},
   },
 };
 function t(key, ...args){
@@ -520,7 +823,7 @@ const pct = x => t('pct', Math.round(x*100));
 
 const app = window.studio?.isApp;
 if (app) document.documentElement.classList.add('app-mode');
-let state = {jobs:[], videos:[], loras:[], model:null};
+let state = {jobs:[], videos:[], loras:[], model:null, packs:{}, image_models:[], download:null};
 const api = (path, body) => fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
 /* plural forms are {one, few, many, other} objects in the dictionary, picked by Intl.PluralRules;
    a missing category falls back to 'other' (cs: 0 and 5+ are 'other', 'many' is only for decimals) */
@@ -530,19 +833,42 @@ const plural = (n, key) => {
   return `${n} ${f[PR.select(n)] ?? f.other}`;
 };
 let opts = Object.assign({res:480, sec:5, aspect:'auto', steps:4}, store.get('opts', {}));
+let iopts = Object.assign({aspect:'1:1', count:1, mp:1, model:'chroma'}, store.get('iopts', {}));
+let mode = store.get('mode', 'video') === 'image' ? 'image' : 'video';   // what the Create view makes
+let libFilter = store.get('libFilter', 'all');
 let image = null;      // {data} for a new upload, or {upload, url} for a reused one
 let loraSel = store.get('loras', {});   // id -> {on, w}
 let current = null;    // video shown in the lightbox
+let navList = null;    // the list the lightbox was opened from (filtered library, recent images, …)
 
 /* ---------- views ---------- */
-function show(view){
+function show(view, m){
+  if (m && m !== mode) setMode(m);
   $('#viewCreate').hidden = view !== 'create';
   $('#viewLib').hidden = view !== 'lib';
-  document.querySelectorAll('.nav').forEach(b => b.classList.toggle('on', b.dataset.view === view));
+  document.querySelectorAll('.nav').forEach(b => b.classList.toggle('on', b.dataset.view === view && (!b.dataset.mode || b.dataset.mode === mode)));
   $('#main').scrollTop = 0;
   store.set('view', view);
 }
-document.querySelectorAll('[data-view]').forEach(b => b.onclick = e => { e.preventDefault(); show(b.dataset.view); });
+document.querySelectorAll('[data-view]').forEach(b => b.onclick = e => { e.preventDefault(); show(b.dataset.view, b.dataset.mode); });
+
+/* video (image -> video) or image (text -> image) */
+function setMode(m){
+  const el = $('#prompt');
+  store.set(mode === 'image' ? 'draftImg' : 'draft', el.value);
+  mode = m; store.set('mode', m);
+  $('#viewCreate').classList.toggle('mode-video', m === 'video');
+  $('#viewCreate').classList.toggle('mode-image', m === 'image');
+  $('#heroTitle').textContent = m === 'image' ? t('hero.imgTitle') : t('hero.title');
+  $('#heroSub').textContent = m === 'image' ? t('hero.imgSub') : t('hero.sub');
+  el.placeholder = m === 'image' ? t('promptImg.ph') : t('prompt.ph');
+  el.value = store.get(m === 'image' ? 'draftImg' : 'draft', '');
+  el.style.height = 'auto'; if (el.value) el.style.height = el.scrollHeight + 'px';
+  $('#recentTitle').textContent = m === 'image' ? t('recent.imgTitle') : t('recent.title');
+  $('#err').textContent = '';
+  renderIdeas(); renderInstall(); renderRecent(); segs();
+  document.querySelectorAll('.nav').forEach(b => b.classList.toggle('on', !$('#viewCreate').hidden && b.dataset.view === 'create' && b.dataset.mode === mode));
+}
 
 /* ---------- composer ---------- */
 function segs(){
@@ -551,7 +877,21 @@ function segs(){
       b.classList.toggle('on', +b.dataset.v === opts[key]);
       b.onclick = () => { opts[key] = +b.dataset.v; saveOpts(); };
     });
-  $('#aspect').value = opts.aspect; $('#steps').value = opts.steps;
+  for (const [id, key] of [['#segCount','count'],['#segMp','mp']])
+    document.querySelectorAll(id+' button').forEach(b => {
+      b.classList.toggle('on', +b.dataset.v === iopts[key]);
+      b.onclick = () => { iopts[key] = +b.dataset.v; saveIopts(); };
+    });
+  $('#aspect').value = opts.aspect; $('#steps').value = opts.steps; $('#aspectImg').value = iopts.aspect;
+  if (mode === 'image'){
+    const est = estimateImg(), p = $('#prompt').value.trim();
+    $('#est').textContent = est ? t('est.approx', fmtDur(est)) : '';
+    $('#est').classList.remove('long'); $('#est').title = est ? t('est.tip') : '';
+    const why = !p ? t('go.needPromptImg') : '';
+    $('#go').disabled = !!why || !state.image_models.length;
+    $('#go').title = why || t('go.title');
+    return;
+  }
   const est = estimate();
   $('#est').textContent = est ? t('est.approx', fmtDur(est)) : '';
   $('#est').classList.toggle('long', est > 3600);
@@ -561,6 +901,19 @@ function segs(){
   $('#go').title = why || t('go.title');
 }
 function saveOpts(){ store.set('opts', opts); segs(); }
+function saveIopts(){ store.set('iopts', iopts); segs(); }
+/* image estimate – same model as server.py img_raw() */
+function imgSize(aspect, mp){
+  const [a, b] = aspect.split(':').map(Number), area = mp * 1024 * 1024;
+  return [Math.round(Math.sqrt(area*a/b)/64)*64, Math.round(Math.sqrt(area*b/a)/64)*64];
+}
+function estimateImg(){
+  const m = state.img_model; if (!m) return null;
+  const model = state.image_models.find(x => x.id === $('#imgModel').value);
+  if (!model) return null;
+  const [w, h] = imgSize(iopts.aspect, iopts.mp), steps = +$('#imgSteps').value || (model.kind === 'chroma' ? 30 : 28);
+  return (m.load + iopts.count * steps * m.step * Math.pow(w*h/1048576, 1.2) * (model.kind === 'chroma' ? 1 : 0.33)) * m.k;
+}
 /* time estimate – same model as server.py (attention grows with the square of the token count) */
 const RATIOS = {'16:9':16/9, '9:16':9/16, '1:1':1, '3:2':3/2, '2:3':2/3, '4:5':4/5};
 function outSize(w, h, aspect, res){
@@ -576,11 +929,14 @@ function estimate(){
   return (m.load + segN * (opts.steps * step + m.dec * n)) * m.k;
 }
 $('#aspect').onchange = e => { opts.aspect = e.target.value; saveOpts(); };
+$('#aspectImg').onchange = e => { iopts.aspect = e.target.value; saveIopts(); };
+$('#imgModel').onchange = e => { iopts.model = e.target.value; saveIopts(); };
+$('#imgSteps').oninput = () => segs();
 $('#steps').onchange = e => { opts.steps = Math.min(50, Math.max(1, +e.target.value || 4)); saveOpts(); };
-$('#advBtn').onclick = () => { $('#adv').classList.toggle('open'); $('#advBtn').classList.toggle('on'); };
-$('#prompt').addEventListener('input', e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; store.set('draft', e.target.value); segs(); });
+$('#advBtn').onclick = () => { const o = !$('#advBtn').classList.contains('on'); $('#adv').classList.toggle('open', o); $('#advImg').classList.toggle('open', o); $('#advBtn').classList.toggle('on', o); };
+$('#prompt').addEventListener('input', e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; store.set(mode === 'image' ? 'draftImg' : 'draft', e.target.value); segs(); });
 $('#prompt').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submit(); });
-$('#prompt').value = store.get('draft', '');
+$('#prompt').value = store.get(mode === 'image' ? 'draftImg' : 'draft', '');
 
 function setImage(img){
   image = img;
@@ -621,7 +977,13 @@ function renderLoras(){
   box.querySelectorAll('[data-w]').forEach(r => r.oninput = () => { (loraSel[r.dataset.w] ??= {on:false}).w = +r.value; r.nextElementSibling.textContent = (+r.value).toFixed(2); store.set('loras', loraSel); });
 }
 
+function imageBody(){
+  return {kind:'image', prompt: $('#prompt').value.trim(), aspect: iopts.aspect, count: iopts.count, mp: iopts.mp,
+          model: $('#imgModel').value, steps: +$('#imgSteps').value || null, cfg: $('#imgCfg').value.trim() || null,
+          seed: $('#imgSeed').value.trim() || null, neg: $('#imgNeg').value.trim() || null};
+}
 async function submit(over){
+  if (!over && mode === 'image'){ if ($('#prompt').value.trim()) return send(imageBody(), true); return; }
   const body = over || {
     prompt: $('#prompt').value.trim(), res: opts.res, sec: opts.sec, aspect: opts.aspect, steps: opts.steps,
     seed: $('#seed').value.trim() || null, neg: $('#neg').value.trim() || null,
@@ -631,14 +993,19 @@ async function submit(over){
   if (!over && (!image || !body.prompt)) return;
   const est = over ? null : estimate();
   if (est > 2*3600 && !confirm(t('confirm.long', fmtDur(est)))) return;
+  return send(body, !over);
+}
+/* own = typed in the composer (clear it on success); otherwise "Again" from the library */
+async function send(body, own){
   $('#err').textContent = ''; $('#go').disabled = true;
   try {
     const r = await api('/api/generate', body);
     const j = await r.json();
     if (!r.ok) throw new Error(tx(j.error) || t('err.server'));
     toast(state.jobs.some(x => x.status === 'running') ? t('toast.queued') : t('toast.generating'));
-    if (!over){ $('#prompt').value = ''; store.set('draft', ''); setImage(null); $('#prompt').style.height = ''; }
-    show('create'); poll();
+    if (own && body.kind === 'image'){ $('#prompt').value = ''; store.set('draftImg', ''); $('#prompt').style.height = ''; }
+    else if (own){ $('#prompt').value = ''; store.set('draft', ''); setImage(null); $('#prompt').style.height = ''; }
+    show('create', body.kind === 'image' ? 'image' : 'video'); poll();
   } catch (e){ $('#err').textContent = e.message; }
   segs();
 }
@@ -654,12 +1021,85 @@ const IDEAS = [
   ['idea.walk', 'walks forward toward the camera, natural gait'],
   ['idea.bg', 'subtle motion in the background, leaves and light shifting'],
 ];
-$('#ideas').innerHTML = IDEAS.map(([l,p]) => `<button class="idea" data-t="${esc(p)}" title="${esc(p)}">+ ${esc(t(l))}</button>`).join('');
-$('#ideas').querySelectorAll('.idea').forEach(b => b.onclick = () => {
-  const el = $('#prompt'), v = el.value.trim();
-  el.value = v ? `${v.replace(/[.,]$/, '')}, ${b.dataset.t}` : b.dataset.t.charAt(0).toUpperCase() + b.dataset.t.slice(1);
-  el.dispatchEvent(new Event('input')); el.focus();
-});
+const STYLES = [
+  ['style.photo', 'photograph, natural light, sharp focus, 35mm film grain'],
+  ['style.cine', 'cinematic film still, dramatic lighting, shallow depth of field'],
+  ['style.portrait', 'close-up portrait, detailed skin texture, soft studio light'],
+  ['style.anime', 'anime illustration, clean line art, vibrant colors'],
+  ['style.oil', 'oil painting, visible brush strokes, rich colors'],
+  ['style.3d', '3d render, soft global illumination, high detail'],
+];
+function renderIdeas(){
+  const list = mode === 'image' ? STYLES : IDEAS;
+  $('#ideas').innerHTML = list.map(([l,p]) => `<button class="idea" data-t="${esc(p)}" title="${esc(p)}">+ ${esc(t(l))}</button>`).join('');
+  $('#ideas').querySelectorAll('.idea').forEach(b => b.onclick = () => {
+    const el = $('#prompt'), v = el.value.trim();
+    el.value = v ? `${v.replace(/[.,]$/, '')}, ${b.dataset.t}` : b.dataset.t.charAt(0).toUpperCase() + b.dataset.t.slice(1);
+    el.dispatchEvent(new Event('input')); el.focus();
+  });
+}
+
+/* image models (Chroma + your SDXL checkpoints) */
+function renderImgModels(){
+  const gc = $('#getChroma'), P = state.packs || {}, dl = state.download;
+  gc.hidden = !(P.image && !P.image.installed && state.image_models.length);
+  if (!gc.hidden){
+    const mine = dl && dl.pack === 'image' && dl.status === 'running';
+    gc.textContent = mine ? `${t('install.alsoChroma')} · ${dl.total ? pct(dl.done / dl.total) : '…'}` : `${t('install.alsoChroma')} (27.5 GB)`;
+    gc.disabled = !!(dl && dl.status === 'running');
+    gc.onclick = () => install('image');
+  }
+  const sel = $('#imgModel'), sig = state.image_models.map(m => m.id).join('|');
+  if (sel.dataset.sig === sig) return;
+  sel.dataset.sig = sig;
+  sel.innerHTML = state.image_models.map(m => `<option value="${esc(m.id)}">${esc(m.name)}${m.kind === 'sdxl' ? ' (SDXL)' : ''}</option>`).join('');
+  sel.value = state.image_models.some(m => m.id === iopts.model) ? iopts.model : (state.image_models[0]?.id || '');
+}
+
+/* "not installed" card with an in-app download */
+const fmtGB = b => b >= 1e9 ? `${(b/1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(b/1e6))} MB`;
+function renderInstall(){
+  const P = state.packs || {}, dl = state.download;
+  const pack = mode === 'video' ? (P.video && !P.video.installed ? 'video' : null)
+                                : (P.image && !state.image_models.length ? 'image' : null);
+  const box = $('#install');
+  box.hidden = !pack;
+  $('#composer').hidden = !!pack;
+  $('#ideas').hidden = !!pack;
+  if (!pack) { box.dataset.sig = ''; return; }
+  const p = P[pack], mine = dl && dl.pack === pack, other = dl && dl.status === 'running' && !mine;
+  const running = mine && dl.status === 'running';
+  const sig = JSON.stringify([pack, mode, LANG, dl && dl.pack, dl && dl.status, P.sdxl && P.sdxl.installed]);
+  if (box.dataset.sig !== sig){
+    box.dataset.sig = sig;
+    const size = p.size_gb >= 1 ? `${p.size_gb} GB` : '5 MB';
+    let act;
+    if (running) act = `<div class="bar"><i id="dlBar"></i></div><span class="num" id="dlNum"></span><button class="btn sm" id="dlStop">${t('install.stop')}</button>`;
+    else if (other) act = `<span class="num">${t('install.otherDl')}</span>`;
+    else act = `<button class="btn pri sm" id="dlGo">${mine && dl.status === 'cancelled' ? t('install.resume') : mine && dl.status === 'error' ? t('install.retry') : t('install.btn', size)}</button>`;
+    let note = '';
+    if (pack === 'image') note = P.sdxl && P.sdxl.installed ? `<div class="note">${t('install.sdxlReady')}</div>`
+      : `<div class="note">${t('install.sdxl')} <button id="dlSdxl" ${dl && dl.status === 'running' ? 'disabled' : ''}>${t('install.sdxlBtn')}</button>.</div>`;
+    box.innerHTML = `<h3>${t('install.title' + pack)}</h3><p>${t('install.desc' + pack)}</p>
+      <div class="meta">${t('install.meta', size, p.vram_gb, p.license)}${pack === 'image' ? '<br>' + t('install.lowVram') : ''}</div>
+      <div class="row">${act}</div>
+      ${mine && dl.status === 'error' ? `<div class="bad">${esc(tx(dl.error))}</div>` : ''}
+      ${mine && dl.status === 'cancelled' ? `<div class="hint" style="margin-top:10px">${t('install.stopped')}</div>` : ''}${note}`;
+    box.querySelector('#dlGo')?.addEventListener('click', () => install(pack));
+    box.querySelector('#dlSdxl')?.addEventListener('click', () => install('sdxl'));
+    box.querySelector('#dlStop')?.addEventListener('click', async () => { await api('/api/install_cancel', {}); poll(); });
+  }
+  if (running){
+    const bar = box.querySelector('#dlBar'), num = box.querySelector('#dlNum');
+    if (bar) bar.style.width = (dl.total ? 100 * dl.done / dl.total : 0).toFixed(1) + '%';
+    if (num) num.textContent = dl.total ? `${t('install.of', fmtGB(dl.done), fmtGB(dl.total))} · ${pct(dl.done / dl.total)}` : t('install.checking');
+  }
+}
+async function install(pack){
+  const r = await api('/api/install', {pack});
+  if (!r.ok) toast(tx((await r.json()).error) || t('err.server'));
+  poll();
+}
 if (app){
   $('#openOut').onclick = () => window.studio.openOutput();
   $('#lbSave').onclick = async () => { if (await window.studio.saveAs(current.name)) toast(t('toast.saved')); };
@@ -668,6 +1108,10 @@ if (app){
 
 /* ---------- render ---------- */
 function card(v){
+  if (v.kind === 'image')
+    return `<button class="card" data-name="${esc(v.name)}"><img class="still" src="${esc(v.url)}" alt="" loading="lazy">
+      ${v.width ? `<span class="tag">${v.width}×${v.height}</span>` : ''}
+      <div class="ov"><p>${esc(v.prompt || v.name)}</p><span>${v.created?fmtDate(v.created):''}${v.model_name?' · '+esc(v.model_name):''}</span></div></button>`;
   let tag = [v.res && v.res+'p', v.sec && v.sec+' '+t('dur.s')].filter(Boolean).join(' · ');
   if (v.partial) tag = (tag ? tag + ' · ' : '') + t('card.partial');
   return `<button class="card" data-name="${esc(v.name)}">
@@ -678,31 +1122,42 @@ function card(v){
 function bindCards(root){
   root.querySelectorAll('.card').forEach(c => {
     const v = c.querySelector('video');
-    c.onmouseenter = () => v.play().catch(()=>{}); c.onmouseleave = () => { v.pause(); };
-    c.onclick = () => openLb(state.videos.find(x => x.name === c.dataset.name));
+    if (v) { c.onmouseenter = () => v.play().catch(()=>{}); c.onmouseleave = () => { v.pause(); }; }
+    c.onclick = () => { navList = root._list || state.videos; openLb(state.videos.find(x => x.name === c.dataset.name)); };
   });
 }
 function renderGrid(el, list, emptyHtml){
-  const sig = list.map(v => v.name + (v.prompt ? '+' : '') + (v.partial ? 'p' : '')).join('|');
+  const sig = list.map(v => v.name + (v.prompt ? '+' : '') + (v.partial ? 'p' : '')).join('|') || 'empty:' + emptyHtml;
   if (el.dataset.sig === sig) return;
   el.dataset.sig = sig;
+  el._list = list;   // the lightbox's ← → step through what this grid shows
   el.innerHTML = list.length ? list.map(card).join('') : `<div class="empty">${emptyHtml}</div>`;
   el.style.columns = list.length ? '' : 'auto';
   bindCards(el);
 }
 function renderLib(){
   const q = $('#q').value.trim().toLowerCase();
-  const list = state.videos.filter(v => !q || (v.prompt||'').toLowerCase().includes(q));
-  renderGrid($('#lib'), list, q ? t('empty.none') : t('empty.lib'));
-  $('#libSub').textContent = plural(state.videos.length, 'n.video');
+  const list = state.videos.filter(v => (libFilter === 'all' || v.kind === libFilter) && (!q || (v.prompt||'').toLowerCase().includes(q)));
+  renderGrid($('#lib'), list, q || libFilter !== 'all' ? t('empty.none') : t('empty.lib'));
+  const nv = state.videos.filter(v => v.kind !== 'image').length, ni = state.videos.length - nv;
+  $('#libSub').textContent = [nv || !ni ? plural(nv, 'n.video') : '', ni ? plural(ni, 'n.image') : ''].filter(Boolean).join(' · ');
+  document.querySelectorAll('#libFilter button').forEach(b => {
+    b.classList.toggle('on', b.dataset.v === libFilter);
+    b.onclick = () => { libFilter = b.dataset.v; store.set('libFilter', libFilter); renderLib(); };
+  });
 }
 $('#q').oninput = renderLib;
+function renderRecent(){
+  const list = state.videos.filter(v => mode === 'image' ? v.kind === 'image' : v.kind !== 'image');
+  renderGrid($('#recent'), list.slice(0, 9), mode === 'image' ? t('empty.recentImg') : t('empty.recent'));
+  $('#allLink').hidden = list.length <= 9;
+}
 
 function jobMeta(j){
   const now = Date.now()/1000;
   if (j.status === 'error') return `<span>${esc(tx(j.error) || t('job.error'))}</span>`;
   if (j.status === 'cancelled') return `<span>${t('job.cancelled')}</span>`;
-  if (j.status === 'queued') return `<span>${t('job.queued')}</span><span>${j.res}p · ${j.sec} ${t('dur.s')}</span>${j.eta?`<span>${j.wait?t('job.startsIn', fmtDur(j.wait)):''}${t('job.takes', fmtDur(j.eta))}</span>`:''}`;
+  if (j.status === 'queued') return `<span>${t('job.queued')}</span><span>${j.kind === 'image' ? `${j.count}× ${j.width}×${j.height}` : `${j.res}p · ${j.sec} ${t('dur.s')}`}</span>${j.eta?`<span>${j.wait?t('job.startsIn', fmtDur(j.wait)):''}${t('job.takes', fmtDur(j.eta))}</span>`:''}`;
   const el = now - j.started, left = j.left;
   return `<span>${esc(tx(j.phase))}</span><span>${pct(j.progress)}</span><span>${fmtDur(el)}${left?t('job.left', fmtDur(left)):''}</span>`;
 }
@@ -719,12 +1174,12 @@ function renderJobs(){
   } else {
   $('#jobs').dataset.sig = sig;
   $('#jobs').innerHTML = js.map(j => `<div class="job ${j.status}" data-job="${j.id}">
-      <div class="pv">${j.poster?`<img src="${esc(j.poster)}" alt="">`:''}</div>
+      <div class="pv">${j.poster?`<img src="${esc(j.poster)}" alt="">`:(j.kind === 'image' ? '<svg width="64" height="64" viewBox="-20 -20 64 64" fill="none" stroke="#6b655d" stroke-width="1.4"><rect x="3" y="4" width="18" height="16"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></svg>' : '')}</div>
       <div class="b"><div class="p">${esc(j.prompt)}</div><div class="m">${jobMeta(j)}</div>
         ${['running','queued'].includes(j.status)?`<div class="bar"><i style="width:${(j.progress*100).toFixed(1)}%"></i></div>`:''}</div>
       ${['running','queued'].includes(j.status)
         ? `<button class="ib" data-cancel="${j.id}" title="${t('job.cancel')}"><svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.7"><path d="M1 1l10 10M11 1 1 11"/></svg></button>`
-        : `<div class="acts2">${app && j.status==='error' ? `<button class="ib" data-log="${esc(j.log)}" title="${t('job.log')}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg></button>` : ''}${j.video ? `<button class="ib" data-play="${esc(j.video)}" title="${t('job.playPartial')}"><svg width="13" height="13" viewBox="0 0 12 12"><path d="M3 1.5v9l7.5-4.5z" fill="currentColor"/></svg></button>` : ''}<button class="ib" data-dismiss="${j.id}" title="${t('job.dismiss')}"><svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.7"><path d="M1 1l10 10M11 1 1 11"/></svg></button></div>`}
+        : `<div class="acts2">${app && j.status==='error' ? `<button class="ib" data-log="${esc(j.log)}" title="${t('job.log')}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg></button>` : ''}${j.video ? `<button class="ib" data-play="${esc(j.video)}" title="${j.kind === 'image' ? t('job.showImages') : t('job.playPartial')}"><svg width="13" height="13" viewBox="0 0 12 12"><path d="M3 1.5v9l7.5-4.5z" fill="currentColor"/></svg></button>` : ''}<button class="ib" data-dismiss="${j.id}" title="${t('job.dismiss')}"><svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.7"><path d="M1 1l10 10M11 1 1 11"/></svg></button></div>`}
     </div>`).join('');
   $('#jobs').querySelectorAll('[data-log]').forEach(b => b.onclick = () => window.studio.openLog(b.dataset.log));
   $('#jobs').querySelectorAll('[data-play]').forEach(b => b.onclick = () => openLb(state.videos.find(v => v.url === b.dataset.play) || {name: b.dataset.play.split('/').pop(), url: b.dataset.play, prompt: t('job.partialPrompt')}));
@@ -749,21 +1204,31 @@ function renderJobs(){
 function openLb(v){
   if (!v) return;
   current = v;
-  $('#lbVid').src = v.url; $('#lbVid').poster = v.poster || '';
+  const isImg = v.kind === 'image' || /\.png$/i.test(v.name || '');
+  $('#lbImg').hidden = !isImg; $('#lbVid').hidden = isImg;
+  if (isImg) { $('#lbVid').pause(); $('#lbVid').removeAttribute('src'); $('#lbImg').src = v.url; }
+  else { $('#lbImg').removeAttribute('src'); $('#lbVid').src = v.url; $('#lbVid').poster = v.poster || ''; }
   $('#lbPrompt').textContent = v.prompt || t('lb.noPrompt');
-  const kv = [[t('lb.res'), v.width ? `${v.width}×${v.height} (${v.res}p)` : (v.res ? v.res+'p' : '')], [t('lb.len'), v.sec && v.sec+' '+t('dur.s')],
+  const kv = isImg ? [[t('lb.size'), v.width && `${v.width}×${v.height}`], [t('lb.aspect'), v.aspect], [t('lb.model'), v.model_name],
+    [t('lb.steps'), v.steps], [t('lb.cfg'), v.cfg], [t('lb.seed'), v.seed], [t('lb.took'), v.took && (v.count > 1 ? `${fmtDur(v.took)} / ${v.count}×` : fmtDur(v.took))],
+    [t('lb.created'), v.created && fmtDate(v.created)], [t('lb.file'), v.name]] : [[t('lb.res'), v.width ? `${v.width}×${v.height} (${v.res}p)` : (v.res ? v.res+'p' : '')], [t('lb.len'), v.sec && v.sec+' '+t('dur.s')],
     ...(v.partial ? [[t('lb.status'), t('lb.incomplete', tx(v.error) || t('lb.failed'))]] : []), [t('lb.aspect'), v.aspect === 'auto' ? t('lb.matchImage') : v.aspect], [t('lb.steps'), v.steps], [t('lb.seed'), v.seed],
     [t('lb.loras'), (v.loras||[]).join(', ')], [t('lb.took'), v.took && fmtDur(v.took)], [t('lb.created'), v.created && fmtDate(v.created)], [t('lb.file'), v.name]];
   $('#lbKv').innerHTML = kv.filter(([,x]) => x != null && x !== '').map(([k,x]) => `<dt>${k}</dt><dd>${esc(x)}</dd>`).join('');
   $('#lbDl').href = v.url; $('#lbDl').download = v.name;
-  const can = !!(v.upload && v.prompt);
+  $('#lbDl').textContent = isImg ? t('lb.downloadPng') : t('lb.download');
+  const can = isImg ? !!(v.prompt && v.aspect) : !!(v.upload && v.prompt);
   $('#lbAgain').hidden = $('#lbEdit').hidden = !can;
+  $('#lbAnimate').hidden = !isImg || !state.videos.some(x => x.name === v.name);
+  $('#lbAgain').classList.toggle('pri', !isImg);
   const wasOpen = $('#lb').classList.contains('open');
   $('#lb').classList.add('open'); document.documentElement.classList.add('lb-open');
   if (!wasOpen) $('#lbClose').focus();
-  $('#lbHint').textContent = state.videos.length > 1 && state.videos.some(x => x.name === v.name) ? t('lb.hintNav') : t('lb.hint');
+  const list = (navList || state.videos).filter(x => state.videos.some(y => y.name === x.name));
+  const nav = list.length > 1 && list.some(x => x.name === v.name);
+  $('#lbHint').textContent = isImg ? (nav ? t('lb.hintNavImg') : t('lb.hintImg')) : nav ? t('lb.hintNav') : t('lb.hint');
 }
-function closeLb(){ $('#lb').classList.remove('open'); document.documentElement.classList.remove('lb-open'); $('#lbVid').pause(); $('#lbVid').removeAttribute('src'); $('#lbVid').load(); current = null; }
+function closeLb(){ $('#lb').classList.remove('open'); document.documentElement.classList.remove('lb-open'); $('#lbVid').pause(); $('#lbVid').removeAttribute('src'); $('#lbVid').load(); $('#lbImg').removeAttribute('src'); current = null; navList = null; }
 $('#lbClose').onclick = closeLb;
 $('#lb').onclick = e => { if (e.target.id === 'lb' || e.target.classList.contains('stage')) closeLb(); };
 document.addEventListener('keydown', e => {
@@ -771,24 +1236,41 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') return closeLb();
   if (e.target.closest('input,textarea,select')) return;
   const vid = $('#lbVid');
-  if (e.key === ' ') { e.preventDefault(); vid.paused ? vid.play() : vid.pause(); }
+  if (e.key === ' ' && !vid.hidden) { e.preventDefault(); vid.paused ? vid.play() : vid.pause(); }
   if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-    const i = state.videos.findIndex(x => x.name === current.name);
-    const n = state.videos[i + (e.key === 'ArrowRight' ? 1 : -1)];
+    const list = (navList || state.videos).filter(x => state.videos.some(y => y.name === x.name));
+    const i = list.findIndex(x => x.name === current.name);
+    const n = list[i + (e.key === 'ArrowRight' ? 1 : -1)];
     if (i >= 0 && n) { e.preventDefault(); openLb(n); }
   }
   if (e.key === 'Tab') {   // keep focus trapped inside the lightbox
-    const f = [...$('#lb').querySelectorAll('button:not([hidden]),a[href],video')].filter(x => x.offsetParent);
+    const f = [...$('#lb').querySelectorAll('button:not([hidden]),a[href],video:not([hidden])')].filter(x => x.offsetParent);
     if (!f.length) return;
     const k = f.indexOf(document.activeElement);
     if (e.shiftKey && k <= 0) { e.preventDefault(); f.at(-1).focus(); }
     else if (!e.shiftKey && k === f.length - 1) { e.preventDefault(); f[0].focus(); }
   }
 });
+const imgAgain = v => ({kind:'image', prompt:v.prompt, aspect:v.aspect||'1:1', count:1, mp:v.mp||1, model:v.model||'chroma',
+                        steps:v.steps||null, cfg:v.cfg ?? null, seed:null, neg:v.neg||null});
+$('#lbAnimate').onclick = async () => { const v = current;
+  const r = await api('/api/use_image', {name: v.name}); const j = await r.json();
+  if (!r.ok) { toast(tx(j.error) || t('err.server')); return; }
+  closeLb(); show('create', 'video'); setImage({upload: j.upload, url: j.url}); $('#prompt').focus(); };
 $('#lbAgain').onclick = () => { const v = current; closeLb();
+  if (v.kind === 'image') return send(imgAgain(v), false);
   submit({prompt:v.prompt, res:v.res, sec:v.sec, aspect:v.aspect||'auto', steps:v.steps||4, upload:v.upload, seed:null,
           neg:v.neg||null, loras:v.lora_ids||[]}); };
 $('#lbEdit').onclick = () => { const v = current; closeLb();
+  if (v.kind === 'image'){
+    show('create', 'image');
+    $('#prompt').value = v.prompt; store.set('draftImg', v.prompt);
+    Object.assign(iopts, {aspect: v.aspect || '1:1', mp: v.mp || 1, model: v.model || iopts.model}); saveIopts();
+    $('#imgModel').value = state.image_models.some(m => m.id === iopts.model) ? iopts.model : $('#imgModel').value;
+    $('#imgSteps').value = v.steps || ''; $('#imgCfg').value = v.cfg ?? ''; $('#imgNeg').value = v.neg || ''; $('#imgSeed').value = '';
+    if (v.neg) { $('#adv').classList.add('open'); $('#advImg').classList.add('open'); $('#advBtn').classList.add('on'); }
+    $('#prompt').dispatchEvent(new Event('input')); $('#prompt').focus(); return;
+  }
   $('#prompt').value = v.prompt; store.set('draft', v.prompt);
   Object.assign(opts, {res:v.res||480, sec:v.sec||5, aspect:v.aspect||'auto', steps:v.steps||4}); saveOpts();
   setImage({upload: v.upload, url: '/uploads/' + encodeURIComponent(v.upload)});
@@ -796,10 +1278,10 @@ $('#lbEdit').onclick = () => { const v = current; closeLb();
   for (const id in loraSel) loraSel[id].on = false;
   for (const l of v.lora_ids || []) loraSel[l.id] = {on:true, w:l.w};
   store.set('loras', loraSel); $('#loraBox').dataset.sig = ''; renderLoras();
-  if (v.neg || (v.lora_ids||[]).length || (v.steps||4) !== 4) { $('#adv').classList.add('open'); $('#advBtn').classList.add('on'); }
-  show('create'); $('#prompt').focus(); };
+  if (v.neg || (v.lora_ids||[]).length || (v.steps||4) !== 4) { $('#adv').classList.add('open'); $('#advImg').classList.add('open'); $('#advBtn').classList.add('on'); }
+  show('create', 'video'); $('#prompt').focus(); };
 $('#lbDel').onclick = async () => {
-  if (!confirm(t('confirm.delete'))) return;
+  if (!confirm(current.kind === 'image' ? t('confirm.deleteImg') : t('confirm.delete'))) return;
   const r = await api('/api/delete', {name: current.name});
   if (!r.ok){ toast(tx((await r.json()).error) || t('toast.cantDelete')); return; }
   closeLb(); toast(t('toast.deleted')); poll();
@@ -808,20 +1290,25 @@ $('#lbDel').onclick = async () => {
 function toast(msg){ const el = $('#toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2200); }
 
 /* ---------- polling ---------- */
-let doneSeen = new Set(), first = true;
+let doneSeen = new Set(), first = true, packsSeen = {};
 async function poll(){
   try {
     const r = await fetch('/api/state'); state = await r.json();
   } catch { $('#gpuTxt').textContent = t('status.offline'); $('#gpuDot').classList.add('busy'); return; }
   $('#mock').hidden = !state.mock;
-  for (const v of state.videos){ if (!first && !doneSeen.has(v.name) && !v.partial) toast(t('toast.done')); doneSeen.add(v.name); }
+  let fresh = null;
+  for (const v of state.videos){ if (!first && !doneSeen.has(v.name) && !v.partial) fresh = v; doneSeen.add(v.name); }
+  if (fresh) toast(fresh.kind === 'image' ? t('toast.imgDone') : t('toast.done'));
+  for (const [k, p] of Object.entries(state.packs || {})){
+    if (!first && p.installed && packsSeen[k] === false) toast(t('toast.installed', p.name));
+    packsSeen[k] = p.installed;
+  }
   first = false;
   $('#libCount').textContent = state.videos.length || '';
-  renderJobs(); renderLoras(); renderLib();
-  renderGrid($('#recent'), state.videos.slice(0, 9), t('empty.recent'));
-  $('#allLink').hidden = state.videos.length <= 9;
+  renderJobs(); renderLoras(); renderLib(); renderImgModels(); renderInstall(); renderRecent();
   segs();
 }
+setMode(mode);
 show(store.get('view', 'create'));
 segs(); poll();
 setInterval(poll, 2000);

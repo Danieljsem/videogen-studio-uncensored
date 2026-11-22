@@ -1,14 +1,8 @@
 @echo off
-title Wan 2.2 I2V
+title Videogen Studio - image to video
 cd /d "%~dp0"
 REM Usage: drag an image onto this file, or: generate.bat image.jpg "prompt" [--res 720] [--sec 5]
-
-set "HIP_PATH=C:\Program Files\AMD\ROCm\7.1\"
-set "PATH=%HIP_PATH%bin;%PATH%"
-set PYTORCH_ROCM_ARCH=gfx1151
-set HSA_OVERRIDE_GFX_VERSION=11.5.1
-set MIOPEN_FIND_MODE=2
-set MIOPEN_LOG_LEVEL=3
+REM GPU settings come from local.env (written by install.bat).
 set PYTHONUTF8=1
 
 if "%~1"=="" (

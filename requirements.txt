@@ -1,5 +1,4 @@
-# PyTorch with ROCm (or CUDA) must be installed first – see README "Installation".
-# Tested with torch 2.12 (ROCm 7.13 nightly from AMD TheRock).
+# PyTorch is installed first by install.bat / install.sh (CUDA, ROCm or CPU build for your GPU).
 diffusers>=0.38,<0.39   # tested: 0.38.0 (uses from_single_file(device=...) and a private LoRA helper)
 transformers>=5.7       # tested: 5.7.0
 safetensors
@@ -7,6 +6,8 @@ accelerate
 peft
 ftfy
 sentencepiece
+protobuf
+huggingface_hub>=0.34
 imageio
 imageio-ffmpeg
 pillow

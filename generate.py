@@ -17,7 +17,10 @@ import threading
 import time
 from pathlib import Path
 
-# AMD gfx1151: without this PyTorch falls back to "math" attention -> tens of GB extra and OOM
+from catalog import load_local_env
+
+load_local_env()   # GPU-specific settings from the installer (local.env), before torch is imported
+# recent AMD GPUs: without this PyTorch falls back to "math" attention -> tens of GB extra and OOM
 os.environ.setdefault("TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL", "1")
 
 import numpy as np
